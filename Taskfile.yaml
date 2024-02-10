@@ -1,0 +1,26 @@
+version: "3"
+
+vars:
+  DATABASE_DSN: postgresql://postgres:admin@localhost:5432/club_service?sslmode=disable
+
+tasks:
+  local:
+    aliases:
+      - loc
+    cmd: go run cmd/main.go --config=./config/local.yaml
+
+  development:
+    aliases:
+      - dev
+    cmd: go run cmd/main.go --config=./config/dev.yaml
+
+  docker-image:
+    aliases:
+      - doc-img
+    cmd: docker build -t arumandesu/club-service -t arumandesu/club-service:0.0.5 . && docker push arumandesu/club-service -a
+
+  migrate-up:
+    cmd: migrate -path ./migrations -database {{.DATABASE_DSN}} up
+
+  migrate-down:
+    cmd: migrate -path ./migrations -database {{.DATABASE_DSN}} down
