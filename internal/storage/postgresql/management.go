@@ -8,7 +8,6 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
-	"github.com/lib/pq"
 	"time"
 )
 
@@ -237,7 +236,7 @@ func (s *Storage) ListClubs(ctx context.Context, query string, clubTypes []strin
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	args := []any{query, pq.Array(clubTypes), filters.Limit(), filters.Offset()}
+	args := []any{query, clubTypes, filters.Limit(), filters.Offset()}
 
 	rows, err := stmt.QueryContext(ctx, args...)
 	if err != nil {
