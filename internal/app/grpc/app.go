@@ -2,6 +2,7 @@ package grpcapp
 
 import (
 	"fmt"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/grpc/club"
 	"google.golang.org/grpc"
 	"log/slog"
 	"net"
@@ -13,8 +14,10 @@ type App struct {
 	port       int
 }
 
-func New(log *slog.Logger, port int) *App {
+func New(log *slog.Logger, port int, managementService club.ManagementService) *App {
 	gRPCServer := grpc.NewServer()
+
+	club.Register(gRPCServer, managementService)
 
 	return &App{
 		log:        log,

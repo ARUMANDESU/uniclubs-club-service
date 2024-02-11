@@ -5,6 +5,7 @@ import (
 	grpcapp "github.com/ARUMANDESU/uniclubs-club-service/internal/app/grpc"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/config"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/user"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage/postgresql"
 	"log/slog"
@@ -30,8 +31,9 @@ func New(log *slog.Logger, cfg *config.Config) *App {
 	}
 
 	usrService := user.New(log, storage)
+	managementService := management.New(log, storage)
 
-	grpcApp := grpcapp.New(log, cfg.GRPC.Port)
+	grpcApp := grpcapp.New(log, cfg.GRPC.Port, managementService)
 	amqpApp := amqpapp.New(log, usrService, rmq)
 
 	return &App{GRPCSrv: grpcApp, AMQPApp: amqpApp}

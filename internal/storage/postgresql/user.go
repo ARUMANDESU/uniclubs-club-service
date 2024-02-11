@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func (s Storage) SaveUser(ctx context.Context, user *domain.User) error {
+func (s *Storage) SaveUser(ctx context.Context, user *domain.User) error {
 	const op = "storage.postgresql.SaveUser"
 
 	stmt, err := s.DB.Prepare(`
@@ -49,7 +49,7 @@ func (s Storage) SaveUser(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
-func (s Storage) GetUserByID(ctx context.Context, userID int64) (*domain.User, error) {
+func (s *Storage) GetUserByID(ctx context.Context, userID int64) (*domain.User, error) {
 	const op = "storage.postgresql.GetUserByID"
 
 	stmt, err := s.DB.Prepare(`
@@ -81,7 +81,7 @@ func (s Storage) GetUserByID(ctx context.Context, userID int64) (*domain.User, e
 	return &user, nil
 }
 
-func (s Storage) UpdateUser(ctx context.Context, user *domain.User) error {
+func (s *Storage) UpdateUser(ctx context.Context, user *domain.User) error {
 	const op = "storage.postgresql.UpdateUser"
 
 	stmt, err := s.DB.Prepare(`
@@ -118,7 +118,7 @@ func (s Storage) UpdateUser(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
-func (s Storage) DeleteUserByID(ctx context.Context, userID int64) error {
+func (s *Storage) DeleteUserByID(ctx context.Context, userID int64) error {
 	const op = "storage.postgresql.DeleteUserByID"
 
 	stmt, err := s.DB.Prepare(`DELETE FROM users WHERE id = $1;`)

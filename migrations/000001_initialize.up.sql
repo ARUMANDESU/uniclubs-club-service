@@ -1,7 +1,7 @@
 CREATE TABLE users(
     id BIGSERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
-    barcode TEXT NOT NULL,
+    barcode TEXT NOT NULL UNIQUE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     avatar_url TEXT NOT NULL DEFAULT ''
