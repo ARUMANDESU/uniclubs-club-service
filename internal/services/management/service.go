@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
 )
 
 var (
 	ErrFailedToBeginTx = errors.New("failed to begin transaction")
+	ErrClubNotExists   = errors.New("club does not exists")
 )
 
 type Service struct {
@@ -23,6 +25,8 @@ type Storage interface {
 	SaveClub(ctx context.Context, dto dtos.CreateClubDTO) error
 	ApproveClub(ctx context.Context, clubID int64) error
 	RejectClub(ctx context.Context, clubID int64) error
+	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
+	ListClubs(ctx context.Context, query string, clubType []string, filters domain.Filters) ([]*domain.Club, *domain.Metadata, error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -71,17 +75,38 @@ func (s Service) RejectClub(ctx context.Context, clubID int64) error {
 	return nil
 }
 
-func (s Service) GetClub(ctx context.Context, clubID int64) error {
-	//TODO implement me
-	panic("implement me")
+func (s Service) GetClub(ctx context.Context, clubID int64) (*domain.Club, error) {
+	const op = "services.management.GetClub"
+	log := s.log.With(slog.String("op", op))
+
+	club, err := s.storage.GetClubByID(ctx, clubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			log.Error("club does not exists", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return club, nil
 }
 
-func (s Service) ListClub(ctx context.Context, query, clubType string, filters domain.Filters) ([]*domain.Club, domain.Metadata, error) {
-	//TODO implement me
-	panic("implement me")
+func (s Service) ListClub(ctx context.Context, query string, clubTypes []string, filters domain.Filters) ([]*domain.Club, *domain.Metadata, error) {
+	const op = "services.management.ListClub"
+	log := s.log.With(slog.String("op", op))
+
+	clubs, metadata, err := s.storage.ListClubs(ctx, query, clubTypes, filters)
+	if err != nil {
+		log.Error("failed to get clubs", logger.Err(err))
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return clubs, metadata, nil
+
 }
 
-func (s Service) ListNotActivatedClubs(ctx context.Context, query, clubType string, filters domain.Filters) ([]*domain.ClubUser, domain.Metadata, error) {
+func (s Service) ListNotActivatedClubs(ctx context.Context, query string, clubType []string, filters domain.Filters) ([]*domain.ClubUser, *domain.Metadata, error) {
 	//TODO implement me
 	panic("implement me")
 }

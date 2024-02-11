@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrInternal = errors.New("internal error")
+	ErrInternal     = errors.New("internal error")
+	ErrClubNotFound = errors.New("club not found")
 )
 
 type serverApi struct {
