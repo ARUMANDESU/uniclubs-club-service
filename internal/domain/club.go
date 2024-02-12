@@ -18,8 +18,19 @@ type Club struct {
 }
 
 type ClubUser struct {
-	Club
-	User
+	Club Club
+	User User
+}
+
+func MapClubUserArrToClubList(cu []*ClubUser) []*clubv1.NotActivatedClubsList {
+	clubUserObjects := make([]*clubv1.NotActivatedClubsList, len(cu))
+	for i, clubUser := range cu {
+		clubUserObjects[i] = &clubv1.NotActivatedClubsList{
+			Clubs: ClubToClubObject(&clubUser.Club),
+			Owner: UserToUserObject(&clubUser.User),
+		}
+	}
+	return clubUserObjects
 }
 
 func ClubToClubObject(club *Club) *clubv1.ClubObject {

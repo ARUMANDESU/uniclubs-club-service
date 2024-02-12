@@ -211,8 +211,13 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	return &club, nil
 }
 
-func (s *Storage) ListClubs(ctx context.Context, query string, clubTypes []string, filters domain.Filters) ([]*domain.Club, *domain.Metadata, error) {
-	const op = "storage.postgresql.GetClubByID"
+func (s *Storage) ListClubs(
+	ctx context.Context,
+	query string,
+	clubTypes []string,
+	filters domain.Filters,
+) ([]*domain.Club, *domain.Metadata, error) {
+	const op = "storage.postgresql.ListClubs"
 
 	stmt, err := s.DB.Prepare(`
 		SELECT count(*) OVER(), c.id, c.name, c.description, c.type, c.logo_url, c.banner_url, c.created_at, COUNT(cu.user_id) as member_count
@@ -271,4 +276,106 @@ func (s *Storage) ListClubs(ctx context.Context, query string, clubTypes []strin
 
 	return clubs, &metadata, nil
 
+}
+
+func (s *Storage) ListNotApprovedClubs(
+	ctx context.Context,
+	query string,
+	clubTypes []string,
+	filters domain.Filters,
+) ([]*domain.ClubUser, *domain.Metadata, error) {
+	const op = "storage.postgresql.ListNotApprovedClubs"
+
+	stmt, err := s.DB.Prepare(`
+		SELECT count(*) OVER(), c.id, c.name,
+		       c.description, c.type, c.logo_url,
+		       c.banner_url, c.created_at, COUNT(ccr.user_id) as member_count,
+		       u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url
+		FROM clubs c
+		JOIN create_club_requests ccr ON c.id = ccr.club_id
+		JOIN users u ON u.id = ccr.user_id
+		WHERE  
+		    ( (STRPOS(LOWER(c.name), LOWER($1)) > 0 OR $1 = '') OR
+			(STRPOS(LOWER(c.description), LOWER($1)) > 0 OR $1 = '') )
+			AND	(type = ANY($2) OR $2::text[] IS NULL)
+			AND NOT c.approved
+		GROUP BY c.id, u.id
+		ORDER BY c.id
+		LIMIT $3 OFFSET $4;
+	`)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer stmt.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	args := []any{query, clubTypes, filters.Limit(), filters.Offset()}
+
+	rows, err := stmt.QueryContext(ctx, args...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer rows.Close()
+
+	var totalRecords int32
+	clubsUsers := []*domain.ClubUser{}
+
+	for rows.Next() {
+		var clubUser domain.ClubUser
+
+		err := rows.Scan(
+			&totalRecords, &clubUser.Club.ID, &clubUser.Club.Name,
+			&clubUser.Club.Description, &clubUser.Club.ClubType, &clubUser.Club.LogoURL,
+			&clubUser.Club.BannerURL, &clubUser.Club.CreatedAt, &clubUser.Club.NumOFMembers,
+			&clubUser.User.ID, &clubUser.User.Email, &clubUser.User.Barcode,
+			&clubUser.User.FirstName, &clubUser.User.LastName, &clubUser.User.AvatarURL,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", op, err)
+		}
+
+		clubsUsers = append(clubsUsers, &clubUser)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	metadata := domain.CalculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return clubsUsers, &metadata, nil
+}
+
+func (s *Storage) InsertJoinRequest(ctx context.Context, userID, clubID int64) error {
+	const op = "storage.postgresql.InsertJoinRequest"
+
+	stmt, err := s.DB.Prepare(`INSERT INTO join_club_requests(user_id, club_id) VALUES ($1, $2)`)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer stmt.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	result, err := stmt.ExecContext(ctx, userID, clubID)
+	if err != nil {
+		return fmt.Errorf("%s: failed to execute query: %w", op, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s: failed to get rows affected from insert: %w", op, err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("%s: no row inserted", op)
+	}
+
+	return nil
 }

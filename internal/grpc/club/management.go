@@ -123,9 +123,46 @@ func (s serverApi) ListClubs(ctx context.Context, req *clubv1.ListClubRequest) (
 
 }
 
+func (s serverApi) ListNotActivatedClubs(ctx context.Context, req *clubv1.ListNotActivatedClubsRequest) (*clubv1.ListNotActivatedClubsResponse, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.PageNumber, validation.Required, validation.Min(1)),
+		validation.Field(&req.PageSize, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	f := domain.Filters{
+		Page:     req.GetPageNumber(),
+		PageSize: req.GetPageSize(),
+	}
+
+	clubsUsers, metadata, err := s.management.ListNotActivatedClubs(ctx, req.GetQuery(), req.GetClubType(), f)
+	if err != nil {
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &clubv1.ListNotActivatedClubsResponse{
+		List:     domain.MapClubUserArrToClubList(clubsUsers),
+		Metadata: domain.ToPagination(metadata),
+	}, nil
+
+}
+
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
-	//TODO implement me
-	panic("implement me")
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = s.management.CreateJoinRequest(ctx, req.GetUserId(), req.GetClubId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s serverApi) HandleJoinClub(ctx context.Context, req *clubv1.HandleJoinClubRequest) (*empty.Empty, error) {
@@ -133,10 +170,6 @@ func (s serverApi) HandleJoinClub(ctx context.Context, req *clubv1.HandleJoinClu
 	panic("implement me")
 }
 
-func (s serverApi) ListNotActivatedClubs(ctx context.Context, req *clubv1.ListNotActivatedClubsRequest) (*clubv1.ListNotActivatedClubsResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
 func (s serverApi) DeactivateClub(ctx context.Context, req *clubv1.DeactivateClubRequest) (*empty.Empty, error) {
 	//TODO implement me
 	panic("implement me")
