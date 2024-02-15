@@ -14,10 +14,21 @@ type App struct {
 	port       int
 }
 
-func New(log *slog.Logger, port int, managementService club.ManagementService) *App {
+func New(
+	log *slog.Logger,
+	port int,
+	managementService club.ManagementService,
+	membershipService club.MembershipService,
+	infoService club.InfoService,
+) *App {
 	gRPCServer := grpc.NewServer()
 
-	club.Register(gRPCServer, managementService)
+	club.Register(
+		gRPCServer,
+		managementService,
+		membershipService,
+		infoService,
+	)
 
 	return &App{
 		log:        log,

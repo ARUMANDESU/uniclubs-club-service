@@ -14,8 +14,19 @@ var (
 type serverApi struct {
 	clubv1.UnimplementedClubServer
 	management ManagementService
+	info       InfoService
+	membership MembershipService
 }
 
-func Register(gRPC *grpc.Server, management ManagementService) {
-	clubv1.RegisterClubServer(gRPC, &serverApi{management: management})
+func Register(
+	gRPC *grpc.Server,
+	management ManagementService,
+	membership MembershipService,
+	info InfoService,
+) {
+	clubv1.RegisterClubServer(gRPC, &serverApi{
+		management: management,
+		membership: membership,
+		info:       info,
+	})
 }

@@ -1,34 +1,16 @@
--- Remove foreign key constraints from 'join_club_requests' table
-ALTER TABLE join_club_requests
-    DROP CONSTRAINT IF EXISTS fk_join_club_requests_user,
-    DROP CONSTRAINT IF EXISTS fk_join_club_requests_club;
+-- Start transaction for migration down script
+BEGIN;
 
--- Remove foreign key constraints from 'create_club_requests' table
-ALTER TABLE create_club_requests
-    DROP CONSTRAINT IF EXISTS fk_create_club_requests_user,
-    DROP CONSTRAINT IF EXISTS fk_create_club_requests_club;
+-- Drop the tables which will automatically remove any associated foreign key constraints
+DROP TABLE IF EXISTS join_club_requests CASCADE;
+DROP TABLE IF EXISTS create_club_requests CASCADE;
+DROP TABLE IF EXISTS users_roles CASCADE;
+DROP TABLE IF EXISTS clubs_users CASCADE;
+DROP TABLE IF EXISTS roles_permissions CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS permissions CASCADE;
+DROP TABLE IF EXISTS clubs CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
--- Remove foreign key constraints from 'clubs_users' table
-ALTER TABLE clubs_users
-    DROP CONSTRAINT IF EXISTS fk_clubs_users_role,
-    DROP CONSTRAINT IF EXISTS fk_clubs_users_club,
-    DROP CONSTRAINT IF EXISTS fk_clubs_users_user;
-
--- Remove foreign key constraints from 'roles_permissions' junction table
-ALTER TABLE roles_permissions
-    DROP CONSTRAINT IF EXISTS fk_roles_permissions_permission,
-    DROP CONSTRAINT IF EXISTS fk_roles_permissions_role;
-
--- Remove foreign key constraint from 'roles' table
-ALTER TABLE roles
-    DROP CONSTRAINT IF EXISTS fk_roles_club;
-
--- Drop tables that were created
-DROP TABLE IF EXISTS join_club_requests;
-DROP TABLE IF EXISTS create_club_requests;
-DROP TABLE IF EXISTS clubs_users;
-DROP TABLE IF EXISTS roles_permissions;
-DROP TABLE IF EXISTS roles;
-DROP TABLE IF EXISTS permissions;
-DROP TABLE IF EXISTS clubs;
-DROP TABLE IF EXISTS users;
+-- Commit the transaction to make sure all operations are executed atomically
+COMMIT;

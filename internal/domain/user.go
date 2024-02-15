@@ -9,17 +9,28 @@ type User struct {
 	LastName  string `json:"last_name"`
 	Barcode   string `json:"barcode"`
 	AvatarURL string `json:"avatar_url"`
-	Role      string `json:"role"`
+	Role      Role
 }
 
-func UserToUserObject(user *User) *clubv1.UserObject {
+func (u User) ToUserObject() *clubv1.UserObject {
 	return &clubv1.UserObject{
-		UserId:    user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Barcode:   user.Barcode,
-		AvatarUrl: user.AvatarURL,
-		Role:      user.Role,
+		UserId:    u.ID,
+		Email:     u.Email,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		Barcode:   u.Barcode,
+		AvatarUrl: u.AvatarURL,
+		Role: &clubv1.Role{
+			Name:        u.Role.Name,
+			Permissions: u.Role.Permissions,
+		},
 	}
+}
+
+func MapUserArrToUserObjectArr(users []*User) []*clubv1.UserObject {
+	userObjects := make([]*clubv1.UserObject, len(users))
+	for i, user := range users {
+		userObjects[i] = user.ToUserObject()
+	}
+	return userObjects
 }
