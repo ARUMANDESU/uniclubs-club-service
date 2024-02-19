@@ -17,7 +17,7 @@ tasks:
   docker-image:
     aliases:
       - doc-img
-    cmd: docker build -t arumandesu/club-service -t arumandesu/club-service:0.0.5 . && docker push arumandesu/club-service -a
+    cmd: docker build -t arumandesu/club-service -t arumandesu/club-service:0.0.2 . && docker push arumandesu/club-service -a
 
   migrate:up:
     cmd: migrate -path ./migrations -database {{.DATABASE_DSN}} up

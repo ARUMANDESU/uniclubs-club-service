@@ -40,6 +40,7 @@ type Storage interface {
 		*domain.Metadata,
 		error,
 	)
+	ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -117,4 +118,17 @@ func (s Service) ListClubMembers(ctx context.Context, clubID int64, filters doma
 	}
 
 	return members, metadata, nil
+}
+
+func (s Service) ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
+	const op = "services.info.ListClubJoinReq"
+	log := s.log.With(slog.String("op", op))
+
+	users, metadata, err := s.storage.ListClubJoinReq(ctx, clubID, filters)
+	if err != nil {
+		log.Error("failed to get join requests of club", logger.Err(err))
+		return nil, nil, err
+	}
+
+	return users, metadata, nil
 }

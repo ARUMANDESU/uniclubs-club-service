@@ -78,18 +78,18 @@ func (s *Storage) ListClubs(
 	const op = "storage.postgresql.ListClubs"
 
 	stmt, err := s.DB.Prepare(`
-		SELECT count(*) OVER(), c.id, c.name, c.description, c.type, c.logo_url, c.banner_url, c.created_at, COUNT(cu.user_id) as member_count
-		FROM clubs c
-		LEFT JOIN clubs_users cu ON c.id = cu.club_id
-		WHERE  
-		    ( (STRPOS(LOWER(c.name), LOWER($1)) > 0 OR $1 = '') OR
-			(STRPOS(LOWER(c.description), LOWER($1)) > 0 OR $1 = '') )
-			AND	(type = ANY($2) OR $2::text[] IS NULL)
-			AND c.approved
-		GROUP BY c.id
-		ORDER BY c.id
-		LIMIT $3 OFFSET $4;
-	`)
+			SELECT count(*) OVER(), c.id, c.name, c.description, c.type, c.logo_url, c.banner_url, c.created_at, COUNT(cu.user_id) as member_count
+			FROM clubs c
+			LEFT JOIN clubs_users cu ON c.id = cu.club_id
+			WHERE  
+				( (STRPOS(LOWER(c.name), LOWER($1)) > 0 OR $1 = '') OR
+				(STRPOS(LOWER(c.description), LOWER($1)) > 0 OR $1 = '') )
+				AND	(type = ANY($2) OR $2::text[] IS NULL)
+				AND c.approved
+			GROUP BY c.id
+			ORDER BY c.id
+			LIMIT $3 OFFSET $4;
+		`)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -213,12 +213,11 @@ func (s *Storage) GetUserClubsByID(ctx context.Context, userID int64) ([]*domain
 
 	stmt, err := s.DB.Prepare(`
 		SELECT c.id, c.name, c.description, c.type, c.logo_url,
-		       c.banner_url, c.created_at, (SELECT COUNT(cu.club_id)FROM clubs_users cu WHERE cu.club_id = c.id GROUP BY cu.club_id) as member_count
-		FROM users u
-		LEFT JOIN clubs_users cu2 ON u.id = cu2.user_id
-		JOIN clubs c ON c.id = cu2.club_id
-		WHERE u.id = $1
-		GROUP BY c.id, u.id;
+		       c.banner_url, c.created_at, (SELECT COUNT(cu2.club_id)FROM clubs_users cu2 WHERE cu2.club_id = c.id GROUP BY cu2.club_id) as member_count
+		FROM clubs_users cu
+		JOIN clubs c ON c.id = cu.club_id
+		WHERE cu.user_id = $1
+		GROUP BY c.id;
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -293,7 +292,7 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 	for rows.Next() {
 		var user domain.User
 
-		err = rows.Scan(&totalRecords, &user.ID, &user.Email, &user.Barcode, &user.FirstName, &user.LastName, &user.AvatarURL, &user.Role)
+		err = rows.Scan(&totalRecords, &user.ID, &user.Email, &user.Barcode, &user.FirstName, &user.LastName, &user.AvatarURL)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", op, err)
 		}
@@ -301,6 +300,75 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 		users = append(users, &user)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	for _, user := range users {
+		rolesQuery := `
+        SELECT id, name, permissions, position, color
+        FROM users_roles ur 
+        JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = $1;
+    `
+		rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, user.ID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: querying roles: %w", op, err)
+		}
+		defer rolesRows.Close()
+
+		for rolesRows.Next() {
+			var r domain.Role
+			err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions.PermissionsHex, &r.Position, &r.Color)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s: scanning roles: %w", op, err)
+			}
+			user.Roles = append(user.Roles, r)
+		}
+		if err := rolesRows.Err(); err != nil {
+			return nil, nil, fmt.Errorf("%s: iterating roles: %w", op, err)
+		}
+
+	}
+
+	metadata := domain.CalculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return users, &metadata, nil
+}
+
+func (s *Storage) ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
+	const op = "storage.postgresql.ListClubJoinReq"
+
+	query := `
+		SELECT count(*) OVER(), u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url
+		FROM join_club_requests jcr 
+		JOIN users u ON u.id = jcr.user_id
+		WHERE jcr.club_id = $1
+		LIMIT $2 OFFSET $3;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	rows, err := s.DB.QueryContext(ctx, query, clubID, filters.Limit(), filters.Offset())
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	var totalRecords int32
+	var users []*domain.User
+
+	for rows.Next() {
+		var user domain.User
+
+		err = rows.Scan(&totalRecords, &user.ID, &user.Email, &user.Barcode, &user.FirstName, &user.LastName, &user.AvatarURL)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", op, err)
+		}
+
+		users = append(users, &user)
+	}
 	if err = rows.Err(); err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", op, err)
 	}

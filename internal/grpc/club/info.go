@@ -33,6 +33,7 @@ type InfoService interface {
 		error,
 	)
 	ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
+	ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
 }
 
 func (s serverApi) GetClub(ctx context.Context, req *clubv1.GetClubRequest) (*clubv1.ClubObject, error) {
@@ -138,6 +139,30 @@ func (s serverApi) ListClubMembers(ctx context.Context, req *clubv1.ListClubMemb
 
 	return &clubv1.ListClubMembersResponse{
 		Users:    domain.MapUserArrToUserObjectArr(members),
+		Metadata: domain.ToPagination(metadata),
+	}, nil
+}
+
+func (s serverApi) ListJoinRequests(ctx context.Context, req *clubv1.ListJoinRequestsRequest) (*clubv1.ListJoinRequestsResponse, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.PageNumber, validation.Required, validation.Min(1)),
+		validation.Field(&req.PageSize, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	f := domain.Filters{
+		Page:     req.GetPageNumber(),
+		PageSize: req.GetPageSize(),
+	}
+
+	users, metadata, err := s.info.ListClubJoinReq(ctx, req.GetClubId(), f)
+	if err != nil {
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	return &clubv1.ListJoinRequestsResponse{
+		Users:    domain.MapUserArrToUserObjectArr(users),
 		Metadata: domain.ToPagination(metadata),
 	}, nil
 }
