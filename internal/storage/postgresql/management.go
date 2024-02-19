@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
-	"time"
 )
 
 func (s *Storage) SaveClub(ctx context.Context, dto dtos.CreateClubDTO) error {
@@ -27,10 +26,11 @@ func (s *Storage) SaveClub(ctx context.Context, dto dtos.CreateClubDTO) error {
 	// Insert into the clubs table and get id.
 	err = tx.QueryRowContext(
 		ctx,
-		"INSERT INTO clubs (name, description, type) VALUES ($1, $2, $3) RETURNING id",
+		"INSERT INTO clubs (name, description, type, owner_id) VALUES ($1, $2, $3, $4) RETURNING id",
 		dto.Name,
 		dto.Description,
 		dto.ClubType,
+		dto.OwnerID,
 	).Scan(&clubID)
 	if err != nil {
 		tx.Rollback()
@@ -98,20 +98,10 @@ func (s *Storage) ApproveClub(ctx context.Context, clubID int64) error {
 	}
 
 	// New president role
-	err = tx.QueryRowContext(ctx, `INSERT INTO roles(club_id, name) VALUES ($1, $2) returning id`, clubID, "President").Scan(&roleID)
+	err = tx.QueryRowContext(ctx, `INSERT INTO roles(club_id, name, permissions, position, color) VALUES ($1, $2, '0', 0, 8223868) returning id`, clubID, "member").Scan(&roleID)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("%s: failed to insert president role: %w", op, err)
-	}
-
-	insertPermissionsQuery := `
-		INSERT INTO roles_permissions(role_id, permission_id) 
-			SELECT $1, generate_series(1, 15);
-	`
-	_, err = tx.ExecContext(ctx, insertPermissionsQuery, roleID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("%s: failed to insert permissions to roles_permissions: %w", op, err)
 	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO clubs_users(user_id, club_id) VALUES ($1, $2)`, userID, clubID)
@@ -179,36 +169,6 @@ func (s *Storage) RejectClub(ctx context.Context, clubID int64) error {
 	// Commit the transaction.
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
-	}
-
-	return nil
-}
-
-func (s *Storage) InsertJoinRequest(ctx context.Context, userID, clubID int64) error {
-	const op = "storage.postgresql.InsertJoinRequest"
-
-	stmt, err := s.DB.Prepare(`INSERT INTO join_club_requests(user_id, club_id) VALUES ($1, $2)`)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-
-	defer stmt.Close()
-
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-
-	result, err := stmt.ExecContext(ctx, userID, clubID)
-	if err != nil {
-		return fmt.Errorf("%s: failed to execute query: %w", op, err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("%s: failed to get rows affected from insert: %w", op, err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("%s: no row inserted", op)
 	}
 
 	return nil

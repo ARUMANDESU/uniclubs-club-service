@@ -8,36 +8,28 @@ CREATE TABLE users (
 );
 
 CREATE TABLE clubs (
-   id BIGSERIAL PRIMARY KEY,
-   name TEXT NOT NULL,
-   approved BOOLEAN DEFAULT false NOT NULL,
-   description TEXT DEFAULT '' NOT NULL,
-   type TEXT DEFAULT '' NOT NULL,
-   logo_url TEXT DEFAULT '' NOT NULL,
-   banner_url TEXT DEFAULT '' NOT NULL,
-   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-CREATE TABLE permissions (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    description TEXT NOT NULL
+    owner_id BIGINT NOT NULL ,
+    approved BOOLEAN DEFAULT false NOT NULL,
+    description TEXT DEFAULT '' NOT NULL,
+    type TEXT DEFAULT '' NOT NULL,
+    logo_url TEXT DEFAULT '' NOT NULL,
+    banner_url TEXT DEFAULT '' NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    FOREIGN KEY (owner_id) REFERENCES users(id)
 );
 
 CREATE TABLE roles (
     id BIGSERIAL PRIMARY KEY,
     club_id BIGINT REFERENCES clubs(id),
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    permissions TEXT NOT NULL DEFAULT '0',
+    position INT NOT NULL,
+    color INT NOT NULL DEFAULT 8223868
 );
 
-CREATE TABLE roles_permissions (
-    role_id BIGINT NOT NULL,
-    permission_id INT NOT NULL,
-    PRIMARY KEY (role_id, permission_id),
-    FOREIGN KEY (role_id) REFERENCES roles(id),
-    FOREIGN KEY (permission_id) REFERENCES permissions(id)
-);
 
 CREATE TABLE clubs_users (
     user_id BIGINT NOT NULL,

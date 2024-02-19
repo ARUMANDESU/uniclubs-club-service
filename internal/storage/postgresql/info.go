@@ -40,7 +40,7 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	}
 
 	rolesQuery := `
-        SELECT id, name
+        SELECT id, name, permissions, position, color
         FROM roles
         WHERE club_id = $1;
     `
@@ -53,46 +53,14 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	var roles []domain.Role
 	for rolesRows.Next() {
 		var r domain.Role
-		if err := rolesRows.Scan(&r.ID, &r.Name); err != nil {
+		err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions.PermissionsHex, &r.Position, &r.Color)
+		if err != nil {
 			return nil, fmt.Errorf("%s: scanning roles: %w", op, err)
 		}
 		roles = append(roles, r)
 	}
 	if err := rolesRows.Err(); err != nil {
 		return nil, fmt.Errorf("%s: iterating roles: %w", op, err)
-	}
-
-	// Query to get permissions for each role.
-	for i, role := range roles {
-		permissionsQuery := `
-            SELECT permissions.name
-            FROM permissions
-            JOIN roles_permissions ON permissions.id = roles_permissions.permission_id
-            WHERE roles_permissions.role_id = $1;
-        `
-		permissionsRows, err := s.DB.QueryContext(ctx, permissionsQuery, role.ID)
-		if err != nil {
-			return nil, fmt.Errorf("%s: querying permissions: %w", op, err)
-		}
-
-		var permissions []string
-		for permissionsRows.Next() {
-			var p string
-			if err := permissionsRows.Scan(&p); err != nil {
-				permissionsRows.Close()
-				return nil, fmt.Errorf("%s: scanning permissions: %w", op, err)
-			}
-			permissions = append(permissions, p)
-		}
-		if err := permissionsRows.Err(); err != nil {
-			permissionsRows.Close()
-			return nil, fmt.Errorf("%s: iterating permissions: %w", op, err)
-		}
-		permissionsRows.Close()
-
-		// Assign the permissions to the role
-		roles[i].Permissions = permissions
-
 	}
 
 	// Assign the roles to the club and return.
@@ -297,11 +265,10 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 	const op = "storage.postgresql.GetUserClubsByID"
 
 	stmt, err := s.DB.Prepare(`
-		SELECT count(*) OVER(), u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url, r.name as role
+		SELECT count(*) OVER(), u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url
 		FROM clubs c 
 		JOIN clubs_users cu ON c.id = cu.club_id
 		JOIN users u ON cu.user_id = u.id
-		JOIN roles r ON r.id = cu.role_id AND r.club_id = c.id
 		WHERE c.id = $1
 		LIMIT $2 OFFSET $3;
 	`)

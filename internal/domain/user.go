@@ -13,6 +13,7 @@ type User struct {
 }
 
 func (u User) ToUserObject() *clubv1.UserObject {
+	u.Role.Permissions.HexToStringArr()
 	return &clubv1.UserObject{
 		UserId:    u.ID,
 		Email:     u.Email,
@@ -22,7 +23,7 @@ func (u User) ToUserObject() *clubv1.UserObject {
 		AvatarUrl: u.AvatarURL,
 		Role: &clubv1.Role{
 			Name:        u.Role.Name,
-			Permissions: u.Role.Permissions,
+			Permissions: u.Role.Permissions.PermissionsArr,
 		},
 	}
 }

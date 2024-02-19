@@ -9,6 +9,7 @@ import (
 type Club struct {
 	ID           int64
 	Name         string
+	OwnerID      int64
 	Description  string
 	ClubType     string
 	LogoURL      string
@@ -18,18 +19,13 @@ type Club struct {
 	Roles        []Role
 }
 
-type Role struct {
-	ID          int
-	Name        string
-	Permissions []string
-}
-
 func (c Club) ToClubObject() *clubv1.ClubObject {
 	roles := make([]*clubv1.Role, len(c.Roles))
 	for i, role := range c.Roles {
+		role.Permissions.HexToStringArr()
 		roles[i] = &clubv1.Role{
 			Name:        role.Name,
-			Permissions: role.Permissions,
+			Permissions: role.Permissions.PermissionsArr,
 		}
 	}
 

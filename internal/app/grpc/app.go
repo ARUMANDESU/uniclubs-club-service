@@ -20,6 +20,7 @@ func New(
 	managementService club.ManagementService,
 	membershipService club.MembershipService,
 	infoService club.InfoService,
+	permission club.PermissionService,
 ) *App {
 	gRPCServer := grpc.NewServer()
 
@@ -28,6 +29,7 @@ func New(
 		managementService,
 		membershipService,
 		infoService,
+		permission,
 	)
 
 	return &App{

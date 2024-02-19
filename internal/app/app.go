@@ -5,6 +5,7 @@ import (
 	grpcapp "github.com/ARUMANDESU/uniclubs-club-service/internal/app/grpc"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/config"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/info"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/membership"
@@ -36,6 +37,7 @@ func New(log *slog.Logger, cfg *config.Config) *App {
 	managementService := management.New(log, storage)
 	membershipService := membership.New(log, storage)
 	infoService := info.New(log, storage)
+	permissionService := accessControl.New(log, storage)
 
 	grpcApp := grpcapp.New(
 		log,
@@ -43,6 +45,7 @@ func New(log *slog.Logger, cfg *config.Config) *App {
 		managementService,
 		membershipService,
 		infoService,
+		permissionService,
 	)
 	amqpApp := amqpapp.New(log, usrService, rmq)
 
