@@ -42,8 +42,3 @@ func Register(
 		permission: permission,
 	})
 }
-
-func (s serverApi) UpdateLogo(ctx context.Context, request *clubv1.UpdateLogoRequest) (*clubv1.ClubObject, error) {
-	//TODO implement me
-	panic("implement me")
-}

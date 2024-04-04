@@ -71,3 +71,23 @@ func (s serverApi) HandleJoinClub(ctx context.Context, req *clubv1.HandleJoinClu
 func (s serverApi) LeaveClub(context.Context, *clubv1.LeaveClubRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeaveClub not implemented")
 }
+
+func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest) (*empty.Empty, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s serverApi) UpdateRole(ctx context.Context, req *clubv1.UpdateRoleRequest) (*empty.Empty, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s serverApi) DeleteRole(ctx context.Context, req *clubv1.DeleteRoleRequest) (*empty.Empty, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s serverApi) ChangeUserRoles(ctx context.Context, req *clubv1.ChangeUserRolesRequest) (*empty.Empty, error) {
+	//TODO implement me
+	panic("implement me")
+}

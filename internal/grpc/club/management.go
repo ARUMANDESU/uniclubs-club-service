@@ -64,3 +64,13 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 	//TODO implement me
 	panic("implement me")
 }
+
+func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest) (*clubv1.ClubObject, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerRequest) (*clubv1.ClubObject, error) {
+	//TODO implement me
+	panic("implement me")
+}

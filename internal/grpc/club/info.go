@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -14,6 +15,7 @@ import (
 type InfoService interface {
 	GetClub(ctx context.Context, clubID int64) (*domain.Club, error)
 	GetUserClubs(ctx context.Context, userID int64) ([]*domain.Club, error)
+	GetUser(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	ListClub(
 		ctx context.Context,
 		query string, clubTypes []string,
@@ -33,7 +35,7 @@ type InfoService interface {
 		error,
 	)
 	ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
-	ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
+	ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
 }
 
 func (s serverApi) GetClub(ctx context.Context, req *clubv1.GetClubRequest) (*clubv1.ClubObject, error) {
@@ -143,26 +145,58 @@ func (s serverApi) ListClubMembers(ctx context.Context, req *clubv1.ListClubMemb
 	}, nil
 }
 
-func (s serverApi) ListJoinRequests(ctx context.Context, req *clubv1.ListJoinRequestsRequest) (*clubv1.ListJoinRequestsResponse, error) {
+func (s serverApi) ListMembershipRequests(ctx context.Context, req *clubv1.ListMembershipRequestsRequest) (*clubv1.ListMembershipRequestsResponse, error) {
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.PageNumber, validation.Required, validation.Min(1)),
 		validation.Field(&req.PageSize, validation.Required, validation.Min(1)),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	isAuthorized, err := s.permission.CanHandleMembershipRequest(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
 	f := domain.Filters{
 		Page:     req.GetPageNumber(),
 		PageSize: req.GetPageSize(),
 	}
 
-	users, metadata, err := s.info.ListClubJoinReq(ctx, req.GetClubId(), f)
+	users, metadata, err := s.info.ListMembershipRequests(ctx, req.GetClubId(), f)
 	if err != nil {
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
-	return &clubv1.ListJoinRequestsResponse{
+
+	return &clubv1.ListMembershipRequestsResponse{
 		Users:    domain.MapUserArrToUserObjectArr(users),
 		Metadata: domain.ToPagination(metadata),
 	}, nil
+
+}
+
+func (s serverApi) GetUserRoles(ctx context.Context, req *clubv1.GetUserRolesRequest) (*clubv1.GetUserRolesResponse, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	user, err := s.info.GetUser(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &clubv1.GetUserRolesResponse{Roles: user.ToUserObject().Roles}, nil
 }

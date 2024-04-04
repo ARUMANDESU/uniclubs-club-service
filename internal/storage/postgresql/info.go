@@ -69,6 +69,62 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	return &club, nil
 }
 
+func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error) {
+	const op = "storage.postgresql.GetUserByID"
+
+	stmt, err := s.DB.Prepare(`
+		SELECT u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url
+		FROM clubs_users cu
+		JOIN users u ON cu.user_id = u.id
+		WHERE cu.club_id = $1 and u.id = $2;
+	`)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, storage.ErrUserNotClubMember)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer stmt.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	var user domain.User
+
+	err = stmt.QueryRowContext(ctx, clubID, userID).Scan(&user.ID, &user.Email, &user.Barcode, &user.FirstName, &user.LastName, &user.AvatarURL)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	rolesQuery := `
+        SELECT id, name, permissions, position, color
+        FROM users_roles ur 
+        JOIN roles r ON ur.role_id = r.id
+        JOIN clubs_users cu ON ur.user_id = cu.user_id
+        WHERE cu.club_id = $1 and ur.user_id = $2;
+    `
+	rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, clubID, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed querying roles: %w", op, err)
+	}
+	defer rolesRows.Close()
+
+	for rolesRows.Next() {
+		var r domain.Role
+		err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions.PermissionsHex, &r.Position, &r.Color)
+		if err != nil {
+			return nil, fmt.Errorf("%s: scanning roles: %w", op, err)
+		}
+		user.Roles = append(user.Roles, r)
+	}
+	if err := rolesRows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: iterating roles: %w", op, err)
+	}
+
+	return &user, nil
+}
+
 func (s *Storage) ListClubs(
 	ctx context.Context,
 	query string,
@@ -336,8 +392,8 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 	return users, &metadata, nil
 }
 
-func (s *Storage) ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
-	const op = "storage.postgresql.ListClubJoinReq"
+func (s *Storage) ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
+	const op = "storage.postgresql.ListMembershipRequests"
 
 	query := `
 		SELECT count(*) OVER(), u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url

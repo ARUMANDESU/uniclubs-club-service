@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	ErrFailedToBeginTx = errors.New("failed to begin transaction")
-	ErrClubNotExists   = errors.New("club does not exists")
+	ErrFailedToBeginTx   = errors.New("failed to begin transaction")
+	ErrClubNotExists     = errors.New("club does not exists")
+	ErrUserNotClubMember = errors.New("user is not a club member")
 )
 
 type Service struct {
@@ -23,6 +24,7 @@ type Service struct {
 type Storage interface {
 	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
 	GetUserClubsByID(ctx context.Context, userID int64) ([]*domain.Club, error)
+	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	ListClubs(
 		ctx context.Context,
 		query string,
@@ -40,7 +42,11 @@ type Storage interface {
 		*domain.Metadata,
 		error,
 	)
-	ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
+	ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) (
+		[]*domain.User,
+		*domain.Metadata,
+		error,
+	)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -65,6 +71,24 @@ func (s Service) GetClub(ctx context.Context, clubID int64) (*domain.Club, error
 	}
 
 	return club, nil
+}
+
+func (s Service) GetUser(ctx context.Context, clubID, userID int64) (*domain.User, error) {
+	const op = "services.info.GetUser"
+	log := s.log.With(slog.String("op", op))
+
+	user, err := s.storage.GetMemberByID(ctx, clubID, userID)
+	if err != nil {
+		if errors.Is(err, storage.ErrUserNotClubMember) {
+			log.Error("user is not a club member", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+		}
+		log.Error("failed to get user by ID", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return user, nil
+
 }
 
 func (s Service) ListClub(ctx context.Context, query string, clubTypes []string, filters domain.Filters) ([]*domain.Club, *domain.Metadata, error) {
@@ -120,11 +144,11 @@ func (s Service) ListClubMembers(ctx context.Context, clubID int64, filters doma
 	return members, metadata, nil
 }
 
-func (s Service) ListClubJoinReq(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
-	const op = "services.info.ListClubJoinReq"
+func (s Service) ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
+	const op = "services.info.ListMembershipRequests"
 	log := s.log.With(slog.String("op", op))
 
-	users, metadata, err := s.storage.ListClubJoinReq(ctx, clubID, filters)
+	users, metadata, err := s.storage.ListMembershipRequests(ctx, clubID, filters)
 	if err != nil {
 		log.Error("failed to get join requests of club", logger.Err(err))
 		return nil, nil, err

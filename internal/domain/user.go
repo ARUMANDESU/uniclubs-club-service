@@ -29,7 +29,7 @@ func (u User) ToUserObject() *clubv1.UserObject {
 		LastName:  u.LastName,
 		Barcode:   u.Barcode,
 		AvatarUrl: u.AvatarURL,
-		Role:      roles,
+		Roles:     roles,
 	}
 }
 
