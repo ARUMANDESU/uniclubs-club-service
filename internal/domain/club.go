@@ -32,6 +32,7 @@ func (c Club) ToClubObject() *clubv1.ClubObject {
 
 	return &clubv1.ClubObject{
 		ClubId:          c.ID,
+		OwnerId:         c.OwnerID,
 		Name:            c.Name,
 		Description:     c.Description,
 		ClubType:        c.ClubType,

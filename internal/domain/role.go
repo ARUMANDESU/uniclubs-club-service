@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
+)
 
 type Role struct {
 	ID          int
@@ -8,6 +11,19 @@ type Role struct {
 	Permissions Permissions
 	Position    int
 	Color       int
+}
+
+func MapToRoleObjectArr(r []Role) []*clubv1.Role {
+	roles := make([]*clubv1.Role, len(r))
+	for i, role := range r {
+		role.Permissions.HexToStringArr()
+		roles[i] = &clubv1.Role{
+			Name:        role.Name,
+			Permissions: role.Permissions.PermissionsArr,
+		}
+	}
+
+	return roles
 }
 
 func GetHighestRolePosition(roles []Role) (int, error) {

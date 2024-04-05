@@ -14,7 +14,7 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	const op = "storage.postgresql.GetClubByID"
 
 	clubQuery := `
-        SELECT id, name, description, type, logo_url, banner_url, created_at, updated_at, COUNT(user_id) as member_count
+        SELECT id, owner_id, name, description, type, logo_url, banner_url, created_at, updated_at, COUNT(user_id) as member_count
         FROM clubs c
         LEFT JOIN clubs_users cu ON c.id = cu.club_id
         WHERE c.id = $1 AND approved
@@ -24,6 +24,7 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	var club domain.Club
 	err := s.DB.QueryRowContext(ctx, clubQuery, clubID).Scan(
 		&club.ID,
+		&club.OwnerID,
 		&club.Name,
 		&club.Description,
 		&club.ClubType,
@@ -269,7 +270,7 @@ func (s *Storage) GetUserClubsByID(ctx context.Context, userID int64) ([]*domain
 	const op = "storage.postgresql.GetUserClubsByID"
 
 	stmt, err := s.DB.Prepare(`
-		SELECT c.id, c.name, c.description, c.type, c.logo_url,
+		SELECT c.id, owner_id, c.name, c.description, c.type, c.logo_url,
 		       c.banner_url, c.created_at, (SELECT COUNT(cu2.club_id)FROM clubs_users cu2 WHERE cu2.club_id = c.id GROUP BY cu2.club_id) as member_count
 		FROM clubs_users cu
 		JOIN clubs c ON c.id = cu.club_id
@@ -294,7 +295,7 @@ func (s *Storage) GetUserClubsByID(ctx context.Context, userID int64) ([]*domain
 		var club domain.Club
 
 		err = rows.Scan(
-			&club.ID, &club.Name,
+			&club.ID, &club.OwnerID, &club.Name,
 			&club.Description, &club.ClubType, &club.LogoURL,
 			&club.BannerURL, &club.CreatedAt, &club.NumOFMembers,
 		)

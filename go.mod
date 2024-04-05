@@ -3,7 +3,7 @@ module github.com/ARUMANDESU/uniclubs-club-service
 go 1.21.5
 
 require (
-	github.com/ARUMANDESU/uniclubs-protos v0.1.2
+	github.com/ARUMANDESU/uniclubs-protos v0.1.6
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/golang/protobuf v1.5.3
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0

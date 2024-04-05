@@ -67,7 +67,7 @@ func (s serverApi) DeactivateClub(ctx context.Context, req *clubv1.DeactivateClu
 	panic("implement me")
 }
 
-func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest) (*empty.Empty, error) {
+func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest) (*clubv1.ClubObject, error) {
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
@@ -112,7 +112,7 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 		return nil, err
 	}
 
-	return &empty.Empty{}, nil
+	return club.ToClubObject(), nil
 
 }
 
@@ -156,7 +156,7 @@ func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerReq
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
-		validation.Field(&req.Logo, validation.Required),
+		validation.Field(&req.Banner, validation.Required),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -173,7 +173,7 @@ func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerReq
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
 	}
 
-	club, err := s.management.UpdateBanner(ctx, req.GetClubId(), req.GetLogo())
+	club, err := s.management.UpdateBanner(ctx, req.GetClubId(), req.GetBanner())
 	if err != nil {
 		switch {
 		case errors.Is(err, management.ErrClubNotExists):

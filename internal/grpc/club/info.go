@@ -15,7 +15,7 @@ import (
 type InfoService interface {
 	GetClub(ctx context.Context, clubID int64) (*domain.Club, error)
 	GetUserClubs(ctx context.Context, userID int64) ([]*domain.Club, error)
-	GetUser(ctx context.Context, clubID, userID int64) (*domain.User, error)
+	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []domain.Role, isOwner bool, err error)
 	ListClub(
 		ctx context.Context,
 		query string, clubTypes []string,
@@ -193,10 +193,10 @@ func (s serverApi) GetUserRoles(ctx context.Context, req *clubv1.GetUserRolesReq
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	user, err := s.info.GetUser(ctx, req.GetClubId(), req.GetUserId())
+	roles, isOwner, err := s.info.GetUserRoles(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 
-	return &clubv1.GetUserRolesResponse{Roles: user.ToUserObject().Roles}, nil
+	return &clubv1.GetUserRolesResponse{Roles: domain.MapToRoleObjectArr(roles), IsOwner: isOwner}, nil
 }
