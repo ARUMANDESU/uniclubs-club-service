@@ -7,6 +7,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -109,7 +110,10 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 
 	err = s.management.UpdateClub(ctx, club)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, storage.ErrEditConflict) {
+			return nil, status.Error(codes.Aborted, ErrEditConflict.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 
 	return club.ToClubObject(), nil
@@ -143,7 +147,7 @@ func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest
 		case errors.Is(err, management.ErrClubNotExists):
 			return nil, status.Error(codes.NotFound, ErrInternal.Error())
 		case errors.Is(err, management.ErrEditConflict):
-			return nil, status.Error(codes.Aborted, ErrInternal.Error())
+			return nil, status.Error(codes.Aborted, ErrEditConflict.Error())
 		default:
 			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}

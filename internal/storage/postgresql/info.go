@@ -136,7 +136,7 @@ func (s *Storage) ListClubs(
 	const op = "storage.postgresql.ListClubs"
 
 	stmt, err := s.DB.Prepare(`
-			SELECT count(*) OVER(), c.id, c.name, c.description, c.type, c.logo_url, c.banner_url, c.created_at, COUNT(cu.user_id) as member_count
+			SELECT count(*) OVER(), c.id, c.owner_id, c.name, c.description, c.type, c.logo_url, c.banner_url, c.created_at, COUNT(cu.user_id) as member_count
 			FROM clubs c
 			LEFT JOIN clubs_users cu ON c.id = cu.club_id
 			WHERE  
@@ -173,7 +173,7 @@ func (s *Storage) ListClubs(
 		var club domain.Club
 
 		err := rows.Scan(
-			&totalRecords, &club.ID, &club.Name,
+			&totalRecords, &club.ID, &club.OwnerID, &club.Name,
 			&club.Description, &club.ClubType, &club.LogoURL,
 			&club.BannerURL, &club.CreatedAt, &club.NumOFMembers,
 		)
