@@ -153,3 +153,22 @@ func (s Service) UpdateBanner(ctx context.Context, clubID int64, banner []byte) 
 
 	return club, nil
 }
+
+func (s Service) UpdateClub(ctx context.Context, club *domain.Club) error {
+	const op = "services.management.UpdateClub"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.UpdateClub(ctx, club)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrEditConflict):
+			log.Error("edit club conflict", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, ErrEditConflict)
+		default:
+			log.Error("failed to get club by ID", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	return nil
+}

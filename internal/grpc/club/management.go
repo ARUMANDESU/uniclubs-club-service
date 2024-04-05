@@ -18,6 +18,7 @@ type ManagementService interface {
 	CreateClub(ctx context.Context, dto dtos.CreateClubDTO) error
 	ApproveClub(ctx context.Context, clubID int64) error
 	RejectClub(ctx context.Context, clubID int64) error
+	UpdateClub(ctx context.Context, club *domain.Club) error
 	UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*domain.Club, error)
 	UpdateBanner(ctx context.Context, clubID int64, banner []byte) (*domain.Club, error)
 }
@@ -67,8 +68,52 @@ func (s serverApi) DeactivateClub(ctx context.Context, req *clubv1.DeactivateClu
 }
 
 func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest) (*empty.Empty, error) {
-	//TODO implement me
-	panic("implement me")
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageClub(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	club, err := s.info.GetClub(ctx, req.GetClubId())
+	if err != nil {
+		if errors.Is(err, management.ErrClubNotExists) {
+			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	paths := req.GetUpdateMask().GetPaths()
+	for _, path := range paths {
+		switch path {
+		case "name":
+			club.Name = req.GetName()
+		case "description":
+			club.Description = req.GetDescription()
+		case "club_type":
+			club.ClubType = req.GetClubType()
+		}
+	}
+
+	err = s.management.UpdateClub(ctx, club)
+	if err != nil {
+		return nil, err
+	}
+
+	return &empty.Empty{}, nil
+
 }
 
 func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest) (*clubv1.ClubObject, error) {
