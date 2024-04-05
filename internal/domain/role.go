@@ -6,23 +6,29 @@ import (
 )
 
 type Role struct {
-	ID          int
+	ID          int64
 	Name        string
 	Permissions Permissions
 	Position    int32
 	Color       int32
 }
 
+func (r *Role) ToRoleProto() *clubv1.Role {
+	_ = r.Permissions.HexToStringArr()
+
+	return &clubv1.Role{
+		Id:          r.ID,
+		Name:        r.Name,
+		Permissions: r.Permissions.PermissionsArr,
+		Position:    r.Position,
+		Color:       r.Color,
+	}
+}
+
 func MapToRoleObjectArr(r []Role) []*clubv1.Role {
 	roles := make([]*clubv1.Role, len(r))
 	for i, role := range r {
-		role.Permissions.HexToStringArr()
-		roles[i] = &clubv1.Role{
-			Name:        role.Name,
-			Permissions: role.Permissions.PermissionsArr,
-			Position:    role.Position,
-			Color:       role.Color,
-		}
+		roles[i] = role.ToRoleProto()
 	}
 
 	return roles

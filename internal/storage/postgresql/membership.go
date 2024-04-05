@@ -3,6 +3,8 @@ package postgresql
 import (
 	"context"
 	"fmt"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"time"
 )
 
@@ -139,4 +141,48 @@ func (s *Storage) DeleteJoinRequest(ctx context.Context, clubID, userID int64) e
 	}
 
 	return nil
+}
+
+func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error) {
+	const op = "storage.postgresql.CreateRole"
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	// Defer the rollback in case of any error.
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx, `UPDATE roles SET position = position + 1 WHERE club_id = $1`, dto.ClubID)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("%s: failed to increment roles position: %w", op, err)
+	}
+
+	query := `
+		INSERT INTO roles(club_id, name, permissions, position, color) 
+		VALUES($1, $2, $3, $4, $5)
+		RETURNING id, name, permissions, position, color`
+
+	var role domain.Role
+
+	args := []any{
+		dto.ClubID, dto.Name,
+		dto.Permissions, dto.Position,
+		dto.Color,
+	}
+
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("%s: failed to insert president role: %w", op, err)
+	}
+
+	return &role, nil
 }

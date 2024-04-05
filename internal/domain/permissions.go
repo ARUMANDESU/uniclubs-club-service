@@ -49,21 +49,20 @@ func (p *Permissions) HexToStringArr() error {
 	return nil
 }
 
-func (p *Permissions) StringArrToHex() error {
+func StringArrToHex(p []string) (uint64, error) {
 	const op = "domain.permission.StringArrToHex"
 
 	var bitValue uint64 = 0
 
-	for _, perm := range p.PermissionsArr {
+	for _, perm := range p {
 		if val, ok := Values[perm]; ok {
 			bitValue |= val
 		} else {
-			return fmt.Errorf("%s: invalid permission name: %s", op, perm)
+			return 0, fmt.Errorf("%s: invalid permission name: %s", op, perm)
 		}
 	}
 
-	p.PermissionsHex = bitValue
-	return nil
+	return bitValue, nil
 }
 
 func AccumulatePermissions(roles []Role) (accumulatedPermissions uint64) {

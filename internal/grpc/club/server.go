@@ -28,6 +28,7 @@ type PermissionService interface {
 	CanActOnMember(ctx context.Context, clubID, userID, targetID int64, permission uint64) (bool, error)
 	CanHandleMembershipRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	CanManageClub(ctx context.Context, clubID, userID int64) (bool, error)
+	CanManageRoles(ctx context.Context, clubID, userID int64) (bool, error)
 }
 
 func Register(

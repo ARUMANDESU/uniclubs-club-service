@@ -48,11 +48,11 @@ func TestStringArrToHex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := Permissions{PermissionsArr: tt.permissions}
-			err := p.StringArrToHex()
+			hex, err := StringArrToHex(p.PermissionsArr)
 			if err != nil {
 				t.Fatalf("StringArrToHex() error = %v", err)
 			}
-			if p.PermissionsHex != tt.expected {
+			if hex != tt.expected {
 				t.Errorf("Expected %v, got %v", tt.expected, p.PermissionsHex)
 			}
 		})

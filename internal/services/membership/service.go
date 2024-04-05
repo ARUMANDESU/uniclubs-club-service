@@ -3,6 +3,8 @@ package membership
 import (
 	"context"
 	"fmt"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
 )
@@ -16,6 +18,7 @@ type Storage interface {
 	InsertJoinRequest(ctx context.Context, userID, clubID int64) error
 	AddNewMember(ctx context.Context, clubID, userID int64) error
 	DeleteJoinRequest(ctx context.Context, clubID, userID int64) error
+	CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -62,4 +65,19 @@ func (s Service) RejectMembership(ctx context.Context, clubID, userID int64) err
 	}
 
 	return nil
+}
+
+func (s Service) CreateNewRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error) {
+	const op = "services.membership.RejectMembership"
+	log := s.log.With(slog.String("op", op))
+
+	role, err := s.storage.CreateRole(ctx, dto)
+	if err != nil {
+		log.Error("failed to create new role", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	log.Info("how?", slog.Any("role: ", role))
+
+	return role, nil
 }

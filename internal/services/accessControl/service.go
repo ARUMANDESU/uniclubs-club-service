@@ -120,3 +120,7 @@ func (s *Service) CanHandleMembershipRequest(ctx context.Context, clubID, userID
 func (s *Service) CanManageClub(ctx context.Context, clubID, userID int64) (bool, error) {
 	return s.HavePermissionTo(ctx, clubID, userID, domain.ManageClub)
 }
+
+func (s *Service) CanManageRoles(ctx context.Context, clubID, userID int64) (bool, error) {
+	return s.HavePermissionTo(ctx, clubID, userID, domain.ManageRoles)
+}

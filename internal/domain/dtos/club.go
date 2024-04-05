@@ -9,6 +9,15 @@ type CreateClubDTO struct {
 	OwnerID     int64
 }
 
+type CreateRoleDTO struct {
+	ClubID      int64
+	UserID      int64
+	Name        string
+	Position    int32
+	Permissions string
+	Color       int32
+}
+
 func CreateClubRequestToDTO(req *clubv1.CreateClubRequest) CreateClubDTO {
 	return CreateClubDTO{
 		Name:        req.Name,
