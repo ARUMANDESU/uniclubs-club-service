@@ -116,3 +116,40 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 
 	return club, nil
 }
+
+func (s Service) UpdateBanner(ctx context.Context, clubID int64, banner []byte) (*domain.Club, error) {
+	const op = "services.management.UpdateBanner"
+	log := s.log.With(slog.String("op", op))
+
+	req, err := s.imageClient.UploadImage(ctx, &imagev1.UploadImageRequest{Image: banner, Filename: fmt.Sprintf("club-%d-banner", clubID)})
+	if err != nil {
+		log.Error("failed to update banner", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	club, err := s.storage.GetClubByID(ctx, clubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			log.Error("club does not exists", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	club.BannerURL = req.ImageUrl
+
+	err = s.storage.UpdateClub(ctx, club)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrEditConflict):
+			log.Error("edit club conflict", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, ErrEditConflict)
+		default:
+			log.Error("failed to get club by ID", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	return club, nil
+}

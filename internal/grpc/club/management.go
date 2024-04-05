@@ -19,6 +19,7 @@ type ManagementService interface {
 	ApproveClub(ctx context.Context, clubID int64) error
 	RejectClub(ctx context.Context, clubID int64) error
 	UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*domain.Club, error)
+	UpdateBanner(ctx context.Context, clubID int64, banner []byte) (*domain.Club, error)
 }
 
 func (s serverApi) CreateClub(ctx context.Context, req *clubv1.CreateClubRequest) (*empty.Empty, error) {
@@ -107,6 +108,37 @@ func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest
 }
 
 func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerRequest) (*clubv1.ClubObject, error) {
-	//TODO implement me
-	panic("implement me")
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Logo, validation.Required),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageClub(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	club, err := s.management.UpdateBanner(ctx, req.GetClubId(), req.GetLogo())
+	if err != nil {
+		switch {
+		case errors.Is(err, management.ErrClubNotExists):
+			return nil, status.Error(codes.NotFound, ErrInternal.Error())
+		case errors.Is(err, management.ErrEditConflict):
+			return nil, status.Error(codes.Aborted, ErrInternal.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return club.ToClubObject(), nil
 }
