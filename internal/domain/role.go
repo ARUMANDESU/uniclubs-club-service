@@ -9,8 +9,8 @@ type Role struct {
 	ID          int
 	Name        string
 	Permissions Permissions
-	Position    int
-	Color       int
+	Position    int32
+	Color       int32
 }
 
 func MapToRoleObjectArr(r []Role) []*clubv1.Role {
@@ -20,13 +20,15 @@ func MapToRoleObjectArr(r []Role) []*clubv1.Role {
 		roles[i] = &clubv1.Role{
 			Name:        role.Name,
 			Permissions: role.Permissions.PermissionsArr,
+			Position:    role.Position,
+			Color:       role.Color,
 		}
 	}
 
 	return roles
 }
 
-func GetHighestRolePosition(roles []Role) (int, error) {
+func GetHighestRolePosition(roles []Role) (int32, error) {
 	const op = "domain.role.GetHighestPositionRole"
 	if len(roles) == 0 {
 		return 0, fmt.Errorf("%s: no roles provided", op)

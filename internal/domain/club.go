@@ -27,6 +27,8 @@ func (c Club) ToClubObject() *clubv1.ClubObject {
 		roles[i] = &clubv1.Role{
 			Name:        role.Name,
 			Permissions: role.Permissions.PermissionsArr,
+			Position:    role.Position,
+			Color:       role.Color,
 		}
 	}
 
