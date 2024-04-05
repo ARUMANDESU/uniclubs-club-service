@@ -14,11 +14,11 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	const op = "storage.postgresql.GetClubByID"
 
 	clubQuery := `
-        SELECT id, name, description, type, logo_url, banner_url, created_at, COUNT(user_id) as member_count
-        FROM clubs
-        LEFT JOIN clubs_users ON clubs.id = clubs_users.club_id
-        WHERE clubs.id = $1 AND approved
-        GROUP BY clubs.id;
+        SELECT id, name, description, type, logo_url, banner_url, created_at, updated_at, COUNT(user_id) as member_count
+        FROM clubs c
+        LEFT JOIN clubs_users cu ON c.id = cu.club_id
+        WHERE c.id = $1 AND approved
+        GROUP BY c.id;
     `
 
 	var club domain.Club
@@ -30,6 +30,7 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 		&club.LogoURL,
 		&club.BannerURL,
 		&club.CreatedAt,
+		&club.UpdatedAt,
 		&club.NumOFMembers,
 	)
 	if err != nil {

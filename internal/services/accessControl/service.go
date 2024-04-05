@@ -89,8 +89,8 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 	return domain.HasPermission(userPermissions, permission), nil
 }
 
-func (s *Service) CanHandleMembershipRequest(ctx context.Context, clubID, userID int64) (bool, error) {
-	const op = "service.accessControl.CanHandleMembershipRequest"
+func (s *Service) HavePermissionTo(ctx context.Context, clubID, userID int64, permission uint64) (bool, error) {
+	const op = "service.accessControl.HavePermissionTo"
 	log := s.log.With(slog.String("op", op))
 
 	userRoles, isUserOwner, err := s.storage.GetUserRoles(ctx, clubID, userID)
@@ -110,6 +110,13 @@ func (s *Service) CanHandleMembershipRequest(ctx context.Context, clubID, userID
 
 	userPermissions := domain.AccumulatePermissions(userRoles)
 
-	return domain.HasPermission(userPermissions, domain.ManageMembership), nil
+	return domain.HasPermission(userPermissions, permission), nil
+}
 
+func (s *Service) CanHandleMembershipRequest(ctx context.Context, clubID, userID int64) (bool, error) {
+	return s.HavePermissionTo(ctx, clubID, userID, domain.ManageMembership)
+}
+
+func (s *Service) CanManageClub(ctx context.Context, clubID, userID int64) (bool, error) {
+	return s.HavePermissionTo(ctx, clubID, userID, domain.ManageClub)
 }

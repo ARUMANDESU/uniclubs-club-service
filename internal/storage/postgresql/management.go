@@ -2,8 +2,12 @@ package postgresql
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 )
 
 func (s *Storage) SaveClub(ctx context.Context, dto dtos.CreateClubDTO) error {
@@ -169,6 +173,36 @@ func (s *Storage) RejectClub(ctx context.Context, clubID int64) error {
 	// Commit the transaction.
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+	}
+
+	return nil
+}
+
+func (s *Storage) UpdateClub(ctx context.Context, club *domain.Club) error {
+	const op = "storage.postgresql.UpdateClub"
+
+	query := `
+        UPDATE clubs 
+        SET name = $2, description = $3, type = $4,
+            logo_url = $5, banner_url = $6, updated_at = current_timestamp
+        WHERE id = $1 AND approved AND updated_at = $7
+        returning updated_at
+    `
+
+	args := []any{
+		club.ID, club.Name, club.Description,
+		club.ClubType, club.LogoURL, club.BannerURL,
+		club.UpdatedAt,
+	}
+
+	err := s.DB.QueryRowContext(ctx, query, args...).Scan(&club.UpdatedAt)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return storage.ErrEditConflict
+		default:
+			return fmt.Errorf("%s: %w", op, err)
+		}
 	}
 
 	return nil

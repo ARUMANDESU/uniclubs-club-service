@@ -7,4 +7,5 @@ var (
 	ErrUserNotExists     = errors.New("user does not exists")
 	ErrClubNotExists     = errors.New("club does not exists")
 	ErrUserNotClubMember = errors.New("user is not club member")
+	ErrEditConflict      = errors.New("edit conflict")
 )

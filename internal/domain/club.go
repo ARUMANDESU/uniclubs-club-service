@@ -16,6 +16,7 @@ type Club struct {
 	BannerURL    string
 	NumOFMembers int64
 	CreatedAt    time.Time
+	UpdatedAt    time.Time
 	Roles        []Role
 }
 

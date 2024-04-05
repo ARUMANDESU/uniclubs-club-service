@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	Env         string   `yaml:"env" env:"ENV" env-default:"local"`
-	GRPC        GRPC     `yaml:"grpc"`
-	Rabbitmq    Rabbitmq `yaml:"rabbitmq"`
-	DatabaseDSN string   `yaml:"database_dsn" env:"DATABASE_DSN" env-required:"true"`
+	Env         string        `yaml:"env" env:"ENV" env-default:"local"`
+	GRPC        GRPC          `yaml:"grpc"`
+	Rabbitmq    Rabbitmq      `yaml:"rabbitmq"`
+	DatabaseDSN string        `yaml:"database_dsn" env:"DATABASE_DSN" env-required:"true"`
+	Clients     ClientsConfig `yaml:"clients"`
 }
 
 type GRPC struct {
@@ -27,6 +28,14 @@ type Rabbitmq struct {
 	Port         string `yaml:"port" env:"RABBITMQ_PORT"`
 	ExchangeName string `yaml:"exchange_name" env:"RABBITMQ_EXCHANGE_NAME"`
 	UserQueue    string `yaml:"user_queue" env:"RABBITMQ_USER_QUEUE"`
+}
+
+type ClientsConfig struct {
+	Image struct {
+		Address      string        `yaml:"address" env:"IMAGE_SERVICE_ADDRESS"`
+		Timeout      time.Duration `yaml:"timeout" env:"IMAGE_SERVICE_TIMEOUT"`
+		RetriesCount int           `yaml:"retries_count" env:"IMAGE_SERVICE_RETRIES_COUNT"`
+	} `yaml:"image"`
 }
 
 func MustLoad() *Config {
