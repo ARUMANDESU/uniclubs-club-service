@@ -31,6 +31,7 @@ type Storage interface {
 	UpdateRole(ctx context.Context, role *domain.Role) error
 	ChangeRolesPosition(ctx context.Context, dto []*dtos.ChangeRolesPositionDTO) error
 	GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*domain.Role, error)
+	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -169,4 +170,26 @@ func (s Service) ChangeRolesPosition(ctx context.Context, clubID int64, dto []*d
 	}
 
 	return roles, nil
+}
+
+func (s Service) AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error {
+	const op = "services.membership.AddRoleMembers"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.AddRoleMembers(ctx, clubID, roleID, usersID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserAlreadyRoleMember):
+			return err
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return err
+		default:
+			log.Error("failed to add new role members", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+	}
+
+	return nil
+
 }

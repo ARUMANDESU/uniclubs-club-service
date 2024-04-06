@@ -100,7 +100,7 @@ func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*dom
 	}
 
 	rolesQuery := `
-        SELECT id, name, permissions, position, color
+        SELECT id
         FROM users_roles ur 
         JOIN roles r ON ur.role_id = r.id
         JOIN clubs_users cu ON ur.user_id = cu.user_id
@@ -113,12 +113,12 @@ func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*dom
 	defer rolesRows.Close()
 
 	for rolesRows.Next() {
-		var r domain.Role
-		err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions.PermissionsHex, &r.Position, &r.Color)
+		var rID int64
+		err = rolesRows.Scan(&rID)
 		if err != nil {
-			return nil, fmt.Errorf("%s: scanning roles: %w", op, err)
+			return nil, fmt.Errorf("%s: scanning roles id: %w", op, err)
 		}
-		user.Roles = append(user.Roles, r)
+		user.Roles = append(user.Roles, rID)
 	}
 	if err := rolesRows.Err(); err != nil {
 		return nil, fmt.Errorf("%s: iterating roles: %w", op, err)
@@ -364,24 +364,24 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 
 	for _, user := range users {
 		rolesQuery := `
-        SELECT id, name, permissions, position, color
-        FROM users_roles ur 
-        JOIN roles r ON ur.role_id = r.id
-        WHERE ur.user_id = $1;
-    `
-		rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, user.ID)
+			SELECT id
+			FROM users_roles ur 
+			JOIN roles r ON ur.role_id = r.id
+			WHERE ur.user_id = $1 AND r.club_id = $2;
+    	`
+		rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, user.ID, clubID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: querying roles: %w", op, err)
 		}
 		defer rolesRows.Close()
 
 		for rolesRows.Next() {
-			var r domain.Role
-			err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions.PermissionsHex, &r.Position, &r.Color)
+			var rID int64
+			err = rolesRows.Scan(&rID)
 			if err != nil {
 				return nil, nil, fmt.Errorf("%s: scanning roles: %w", op, err)
 			}
-			user.Roles = append(user.Roles, r)
+			user.Roles = append(user.Roles, rID)
 		}
 		if err := rolesRows.Err(); err != nil {
 			return nil, nil, fmt.Errorf("%s: iterating roles: %w", op, err)

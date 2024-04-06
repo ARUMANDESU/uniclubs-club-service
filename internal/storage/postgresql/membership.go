@@ -8,6 +8,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
+	"github.com/jackc/pgx/v5/pgconn"
 	"strconv"
 	"time"
 )
@@ -362,4 +363,62 @@ func (s *Storage) GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*doma
 	}
 
 	return roles, nil
+}
+
+func (s *Storage) AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error {
+	const op = "storage.postgresql.AddRoleMembers"
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	// Defer the rollback in case of any error.
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	addMemberQuery := `
+		INSERT INTO users_roles(role_id, user_id)
+		    values ($1, $2)
+	`
+
+	checkClubMemberQuery := `
+		SELECT cu.user_id
+		FROM clubs_users cu 
+		WHERE cu.user_id = $1 AND cu.club_id = $2
+	`
+
+	for _, userID := range usersID {
+		err = tx.QueryRowContext(ctx, checkClubMemberQuery, userID, clubID).Scan(&userID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				tx.Rollback()
+				return fmt.Errorf("%d: %w", userID, storage.ErrUserNotClubMember)
+			}
+			tx.Rollback()
+			return fmt.Errorf("%s: failed to get a club member: %w", op, err)
+		}
+
+		_, err := tx.ExecContext(ctx, addMemberQuery, roleID, userID)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) {
+				if pgErr.Code == "23505" {
+					tx.Rollback()
+					return fmt.Errorf("%d: %w", userID, domain.ErrUserAlreadyRoleMember)
+				}
+			}
+			tx.Rollback()
+			return fmt.Errorf("%s: failed to add new role members: %w", op, err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+	}
+
+	return nil
 }

@@ -9,16 +9,10 @@ type User struct {
 	LastName  string `json:"last_name"`
 	Barcode   string `json:"barcode"`
 	AvatarURL string `json:"avatar_url"`
-	Roles     []Role
+	Roles     []int64
 }
 
 func (u User) ToUserObject() *clubv1.UserObject {
-	roles := make([]*clubv1.Role, len(u.Roles))
-	for i, role := range u.Roles {
-		role.Permissions.HexToStringArr()
-		roles[i] = role.ToRoleProto()
-	}
-
 	return &clubv1.UserObject{
 		UserId:    u.ID,
 		Email:     u.Email,
@@ -26,7 +20,7 @@ func (u User) ToUserObject() *clubv1.UserObject {
 		LastName:  u.LastName,
 		Barcode:   u.Barcode,
 		AvatarUrl: u.AvatarURL,
-		Roles:     roles,
+		Roles:     u.Roles,
 	}
 }
 

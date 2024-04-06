@@ -7,6 +7,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/membership"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -24,6 +25,7 @@ type MembershipService interface {
 	GetRole(ctx context.Context, clubID, roleID int64) (*domain.Role, error)
 	UpdateRole(ctx context.Context, role *domain.Role) error
 	ChangeRolesPosition(ctx context.Context, clubID int64, dto []*dtos.ChangeRolesPositionDTO) ([]*domain.Role, error)
+	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 }
 
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
@@ -265,7 +267,40 @@ func (s serverApi) ChangeRolesPosition(ctx context.Context, req *clubv1.ChangeRo
 	return &clubv1.ChangeRolesPositionResponse{Roles: domain.MapToRoleObjectArr(roles)}, nil
 }
 
-func (s serverApi) AddRoleMembers(ctx context.Context, req *clubv1.AddRoleMembersRequest) (*clubv1.AddRoleMembersResponses, error) {
-	//TODO implement me
-	panic("implement me")
+func (s serverApi) AddRoleMembers(ctx context.Context, req *clubv1.AddRoleMembersRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.RoleId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UsersId, validation.Required, validation.Each(validation.Min(1))),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	err = s.membership.AddRoleMembers(ctx, req.GetClubId(), req.GetRoleId(), req.GetUsersId())
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserAlreadyRoleMember):
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+
+	}
+
+	return &empty.Empty{}, nil
 }

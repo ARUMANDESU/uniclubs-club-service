@@ -27,7 +27,7 @@ func MapToChangeRolesPositionDTOArr(roles []*clubv1.ChangeRolesPositionItems) []
 	dto := make([]*ChangeRolesPositionDTO, len(roles))
 	for i, role := range roles {
 		dto[i] = &ChangeRolesPositionDTO{
-			RoleID:   int64(role.GetId()),
+			RoleID:   role.GetId(),
 			Position: role.GetPosition(),
 		}
 	}
