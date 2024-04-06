@@ -29,6 +29,8 @@ type Storage interface {
 	DeleteRoleByID(ctx context.Context, clubID, roleID int64) error
 	GetRoleByID(ctx context.Context, clubID, roleID int64) (*domain.Role, error)
 	UpdateRole(ctx context.Context, role *domain.Role) error
+	ChangeRolesPosition(ctx context.Context, dto []*dtos.ChangeRolesPositionDTO) error
+	GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*domain.Role, error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -145,4 +147,26 @@ func (s Service) UpdateRole(ctx context.Context, role *domain.Role) error {
 	}
 
 	return nil
+}
+
+func (s Service) ChangeRolesPosition(ctx context.Context, clubID int64, dto []*dtos.ChangeRolesPositionDTO) ([]*domain.Role, error) {
+	const op = "services.membership.ChangeRolesPosition"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.ChangeRolesPosition(ctx, dto)
+	if err != nil {
+		log.Error("failed to change roles positions", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	roles, err := s.storage.GetRolesOfClubByID(ctx, clubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubOrRoleNotExists) {
+			return nil, fmt.Errorf("%s: %w", op, ErrClubOrRoleNotExists)
+		}
+		log.Error("failed to get roles of the club", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return roles, nil
 }

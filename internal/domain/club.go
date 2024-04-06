@@ -33,13 +33,7 @@ func (c Club) ToClubObject() *clubv1.ClubObject {
 	roles := make([]*clubv1.Role, len(c.Roles))
 	for i, role := range c.Roles {
 		role.Permissions.HexToStringArr()
-		roles[i] = &clubv1.Role{
-			Id:          role.ID,
-			Name:        role.Name,
-			Permissions: role.Permissions.PermissionsArr,
-			Position:    role.Position,
-			Color:       role.Color,
-		}
+		roles[i] = role.ToRoleProto()
 	}
 
 	return &clubv1.ClubObject{

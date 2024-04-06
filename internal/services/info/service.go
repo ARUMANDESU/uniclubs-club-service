@@ -24,7 +24,7 @@ type Service struct {
 type Storage interface {
 	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
 	GetUserClubsByID(ctx context.Context, userID int64) ([]*domain.Club, error)
-	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []domain.Role, isOwner bool, err error)
+	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 	ListClubs(
 		ctx context.Context,
 		query string,
@@ -73,7 +73,7 @@ func (s Service) GetClub(ctx context.Context, clubID int64) (*domain.Club, error
 	return club, nil
 }
 
-func (s Service) GetUserRoles(ctx context.Context, clubID, userID int64) (roles []domain.Role, isOwner bool, err error) {
+func (s Service) GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error) {
 	const op = "services.info.GetUser"
 	log := s.log.With(slog.String("op", op))
 

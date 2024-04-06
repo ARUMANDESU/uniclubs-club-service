@@ -74,7 +74,7 @@ func StringArrToHex(p []string) (uint64, error) {
 	return bitValue, nil
 }
 
-func AccumulatePermissions(roles []Role) (accumulatedPermissions uint64) {
+func AccumulatePermissions(roles []*Role) (accumulatedPermissions uint64) {
 	for _, role := range roles {
 		if role.Permissions.PermissionsHex&Administrator == Administrator {
 			return ALL

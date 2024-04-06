@@ -16,10 +16,7 @@ func (u User) ToUserObject() *clubv1.UserObject {
 	roles := make([]*clubv1.Role, len(u.Roles))
 	for i, role := range u.Roles {
 		role.Permissions.HexToStringArr()
-		roles[i] = &clubv1.Role{
-			Name:        role.Name,
-			Permissions: role.Permissions.PermissionsArr,
-		}
+		roles[i] = role.ToRoleProto()
 	}
 
 	return &clubv1.UserObject{

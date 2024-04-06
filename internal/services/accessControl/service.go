@@ -22,7 +22,7 @@ type Service struct {
 }
 
 type Storage interface {
-	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []domain.Role, isOwner bool, err error)
+	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {

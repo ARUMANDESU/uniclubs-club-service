@@ -29,7 +29,7 @@ func New(databaseDSN string) (*Storage, error) {
 	return &Storage{DB: db}, nil
 }
 
-func (s *Storage) GetUserRoles(ctx context.Context, clubID, userID int64) (roles []domain.Role, isOwner bool, err error) {
+func (s *Storage) GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error) {
 	const op = "storage.postgresql.GetUserRoles"
 
 	query := `
@@ -54,7 +54,7 @@ func (s *Storage) GetUserRoles(ctx context.Context, clubID, userID int64) (roles
 		if err != nil {
 			return nil, false, fmt.Errorf("%s: %w", op, err)
 		}
-		roles = append(roles, role)
+		roles = append(roles, &role)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, false, fmt.Errorf("%s: %w", op, err)

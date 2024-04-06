@@ -18,6 +18,23 @@ type CreateRoleDTO struct {
 	Color       int32
 }
 
+type ChangeRolesPositionDTO struct {
+	RoleID   int64
+	Position int32
+}
+
+func MapToChangeRolesPositionDTOArr(roles []*clubv1.ChangeRolesPositionItems) []*ChangeRolesPositionDTO {
+	dto := make([]*ChangeRolesPositionDTO, len(roles))
+	for i, role := range roles {
+		dto[i] = &ChangeRolesPositionDTO{
+			RoleID:   int64(role.GetId()),
+			Position: role.GetPosition(),
+		}
+	}
+
+	return dto
+}
+
 func CreateClubRequestToDTO(req *clubv1.CreateClubRequest) CreateClubDTO {
 	return CreateClubDTO{
 		Name:        req.Name,

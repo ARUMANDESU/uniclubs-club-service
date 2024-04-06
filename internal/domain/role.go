@@ -28,7 +28,7 @@ func (r *Role) ToRoleProto() *clubv1.Role {
 	}
 }
 
-func MapToRoleObjectArr(r []Role) []*clubv1.Role {
+func MapToRoleObjectArr(r []*Role) []*clubv1.Role {
 	roles := make([]*clubv1.Role, len(r))
 	for i, role := range r {
 		roles[i] = role.ToRoleProto()
@@ -37,7 +37,7 @@ func MapToRoleObjectArr(r []Role) []*clubv1.Role {
 	return roles
 }
 
-func GetHighestRolePosition(roles []Role) (int32, error) {
+func GetHighestRolePosition(roles []*Role) (int32, error) {
 	const op = "domain.role.GetHighestPositionRole"
 	if len(roles) == 0 {
 		return 0, fmt.Errorf("%s: no roles provided", op)

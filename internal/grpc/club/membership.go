@@ -23,6 +23,7 @@ type MembershipService interface {
 	DeleteRole(ctx context.Context, clubID, roleID int64) error
 	GetRole(ctx context.Context, clubID, roleID int64) (*domain.Role, error)
 	UpdateRole(ctx context.Context, role *domain.Role) error
+	ChangeRolesPosition(ctx context.Context, clubID int64, dto []*dtos.ChangeRolesPositionDTO) ([]*domain.Role, error)
 }
 
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
@@ -232,12 +233,39 @@ func (s serverApi) DeleteRole(ctx context.Context, req *clubv1.DeleteRoleRequest
 
 }
 
-func (s serverApi) ChangeRolesPosition(ctx context.Context, request *clubv1.ChangeRolesPositionRequest) (*clubv1.ChangeRolesPositionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+func (s serverApi) ChangeRolesPosition(ctx context.Context, req *clubv1.ChangeRolesPositionRequest) (*clubv1.ChangeRolesPositionResponse, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Roles, validation.Required),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	roles, err := s.membership.ChangeRolesPosition(ctx, req.GetClubId(), dtos.MapToChangeRolesPositionDTOArr(req.Roles))
+	if err != nil {
+		if errors.Is(err, membership.ErrClubOrRoleNotExists) {
+			return nil, status.Error(codes.NotFound, ErrClubOrRoleNotExists.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &clubv1.ChangeRolesPositionResponse{Roles: domain.MapToRoleObjectArr(roles)}, nil
 }
 
-func (s serverApi) AddRoleMembers(ctx context.Context, request *clubv1.AddRoleMembersRequest) (*clubv1.AddRoleMembersResponses, error) {
+func (s serverApi) AddRoleMembers(ctx context.Context, req *clubv1.AddRoleMembersRequest) (*clubv1.AddRoleMembersResponses, error) {
 	//TODO implement me
 	panic("implement me")
 }

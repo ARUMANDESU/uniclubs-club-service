@@ -294,3 +294,72 @@ func (s *Storage) UpdateRole(ctx context.Context, role *domain.Role) error {
 
 	return nil
 }
+
+func (s *Storage) ChangeRolesPosition(ctx context.Context, dto []*dtos.ChangeRolesPositionDTO) error {
+	const op = "storage.postgresql.ChangeRolesPosition"
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	// Defer the rollback in case of any error.
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	query := `
+		UPDATE roles
+		SET position = $2
+		WHERE id = $1
+	`
+	for _, role := range dto {
+		_, err := tx.ExecContext(ctx, query, role.RoleID, role.Position)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("%s: failed to delete role: %w", op, err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+	}
+
+	return nil
+}
+
+func (s *Storage) GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*domain.Role, error) {
+	const op = "storage.postgresql.GetRolesOfClubByID"
+
+	query := `
+		SELECT id, name, permissions, position, color, updated_at
+		FROM roles
+		WHERE club_id = $1 AND name != 'member'
+	`
+
+	roles := []*domain.Role{}
+
+	rows, err := s.DB.QueryContext(ctx, query, clubID)
+	defer rows.Close()
+
+	for rows.Next() {
+		var role domain.Role
+		err = rows.Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color, &role.UpdatedAt)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, storage.ErrClubOrRoleNotExists
+			}
+			return nil, fmt.Errorf("%s: failed to get a role: %w", op, err)
+		}
+
+		roles = append(roles, &role)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return roles, nil
+}
