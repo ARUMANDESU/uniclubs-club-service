@@ -14,6 +14,7 @@ var (
 	ErrTargetNotClubMember = errors.New("target user is not club member")
 	ErrUserNonAuthorized   = errors.New("user does not have permission")
 	ErrEditConflict        = errors.New("unable to update the record due to an edit conflict, please try again")
+	ErrClubOrRoleNotExists = errors.New("club or role may not exists")
 )
 
 type serverApi struct {

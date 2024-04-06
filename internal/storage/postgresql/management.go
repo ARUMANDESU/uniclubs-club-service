@@ -105,7 +105,7 @@ func (s *Storage) ApproveClub(ctx context.Context, clubID int64) error {
 	err = tx.QueryRowContext(ctx, `INSERT INTO roles(club_id, name, permissions, position, color) VALUES ($1, $2, '0', 0, 8223868) returning id`, clubID, "member").Scan(&roleID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to insert president role: %w", op, err)
+		return fmt.Errorf("%s: failed to insert member role: %w", op, err)
 	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO clubs_users(user_id, club_id) VALUES ($1, $2)`, userID, clubID)

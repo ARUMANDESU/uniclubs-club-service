@@ -6,6 +6,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/membership"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -19,6 +20,9 @@ type MembershipService interface {
 	ApproveMembership(ctx context.Context, clubID, userID int64) error
 	RejectMembership(ctx context.Context, clubID, userID int64) error
 	CreateNewRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error)
+	DeleteRole(ctx context.Context, clubID, roleID int64) error
+	GetRole(ctx context.Context, clubID, roleID int64) (*domain.Role, error)
+	UpdateRole(ctx context.Context, role *domain.Role) error
 }
 
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
@@ -80,7 +84,7 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
-		validation.Field(&req.Name, validation.Required, validation.Length(4, 75)),
+		validation.Field(&req.Name, validation.Required, validation.Length(domain.MinClubNameLen, domain.MaxClubNameLen)),
 		validation.Field(&req.Permissions, validation.Each(validation.In(
 			"Administrator",
 			"ManageClub",
@@ -89,7 +93,7 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 			"BanMember",
 			"ManageRoles"))),
 		validation.Field(&req.Position, validation.Required, validation.Min(1)),
-		validation.Field(&req.Color, validation.Required),
+		validation.Field(&req.Color, validation.Required, validation.Min(0)),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -130,13 +134,102 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 }
 
 func (s serverApi) UpdateRole(ctx context.Context, req *clubv1.UpdateRoleRequest) (*clubv1.Role, error) {
-	//TODO implement me
-	panic("implement me")
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.RoleId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Permissions, validation.Each(validation.In(
+			"Administrator",
+			"ManageClub",
+			"ManageMembership",
+			"KickMember",
+			"BanMember",
+			"ManageRoles"))),
+		validation.Field(&req.Color, validation.Min(0)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	role, err := s.membership.GetRole(ctx, req.GetClubId(), req.GetRoleId())
+	if err != nil {
+		if errors.Is(err, ErrClubOrRoleNotExists) {
+			return nil, status.Error(codes.NotFound, ErrClubOrRoleNotExists.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	role.ClubID = req.GetClubId()
+
+	paths := req.GetUpdateMask().GetPaths()
+	for _, path := range paths {
+		switch path {
+		case "name":
+			role.Name = req.GetName()
+		case "permissions":
+			hexPermissions, err := domain.StringArrToHex(req.GetPermissions())
+			if err != nil {
+				return nil, status.Error(codes.Internal, ErrInternal.Error())
+			}
+			role.Permissions.PermissionsArr = req.GetPermissions()
+			role.Permissions.PermissionsHex = hexPermissions
+		case "color":
+			role.Color = req.GetColor()
+		}
+	}
+
+	err = s.membership.UpdateRole(ctx, role)
+	if err != nil {
+		if errors.Is(err, membership.ErrEditConflict) {
+			return nil, status.Error(codes.Aborted, ErrEditConflict.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return role.ToRoleProto(), nil
 }
 
 func (s serverApi) DeleteRole(ctx context.Context, req *clubv1.DeleteRoleRequest) (*empty.Empty, error) {
-	//TODO implement me
-	panic("implement me")
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.RoleId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	err = s.membership.DeleteRole(ctx, req.GetClubId(), req.GetRoleId())
+	if err != nil {
+		if errors.Is(err, membership.ErrClubOrRoleNotExists) {
+			return nil, status.Error(codes.NotFound, ErrClubOrRoleNotExists.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &empty.Empty{}, nil
+
 }
 
 func (s serverApi) ChangeRolesPosition(ctx context.Context, request *clubv1.ChangeRolesPositionRequest) (*clubv1.ChangeRolesPositionResponse, error) {

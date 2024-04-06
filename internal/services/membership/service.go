@@ -2,11 +2,18 @@ package membership
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
+)
+
+var (
+	ErrClubOrRoleNotExists = errors.New("club or role does not exists")
+	ErrEditConflict        = errors.New("edit conflict")
 )
 
 type Service struct {
@@ -19,6 +26,9 @@ type Storage interface {
 	AddNewMember(ctx context.Context, clubID, userID int64) error
 	DeleteJoinRequest(ctx context.Context, clubID, userID int64) error
 	CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error)
+	DeleteRoleByID(ctx context.Context, clubID, roleID int64) error
+	GetRoleByID(ctx context.Context, clubID, roleID int64) (*domain.Role, error)
+	UpdateRole(ctx context.Context, role *domain.Role) error
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -78,4 +88,61 @@ func (s Service) CreateNewRole(ctx context.Context, dto dtos.CreateRoleDTO) (*do
 	}
 
 	return role, nil
+}
+
+func (s Service) DeleteRole(ctx context.Context, clubID, roleID int64) error {
+	const op = "services.membership.DeleteRole"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.DeleteRoleByID(ctx, clubID, roleID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubOrRoleNotExists) {
+			return fmt.Errorf("%s: %w", op, ErrClubOrRoleNotExists)
+		}
+		log.Error("failed to delete a role", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (s Service) GetRole(ctx context.Context, clubID, roleID int64) (*domain.Role, error) {
+	const op = "services.membership.GetRole"
+	log := s.log.With(slog.String("op", op))
+
+	role, err := s.storage.GetRoleByID(ctx, clubID, roleID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubOrRoleNotExists) {
+			return nil, fmt.Errorf("%s: %w", op, ErrClubOrRoleNotExists)
+		}
+		log.Error("failed to get the role", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	_ = role.Permissions.HexToStringArr()
+
+	return role, nil
+}
+
+func (s Service) UpdateRole(ctx context.Context, role *domain.Role) error {
+	const op = "services.membership.UpdateRole"
+	log := s.log.With(slog.String("op", op))
+
+	hexPerms, err := domain.StringArrToHex(role.Permissions.PermissionsArr)
+	if err != nil {
+		log.Error("failed to map array of permissions into hexadecimal", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	role.Permissions.PermissionsHex = hexPerms
+
+	err = s.storage.UpdateRole(ctx, role)
+	if err != nil {
+		if errors.Is(err, storage.ErrEditConflict) {
+			return fmt.Errorf("%s: %w", op, ErrEditConflict)
+		}
+		log.Error("failed to update the role", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }

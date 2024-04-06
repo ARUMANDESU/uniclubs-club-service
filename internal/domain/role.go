@@ -3,14 +3,17 @@ package domain
 import (
 	"fmt"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
+	"time"
 )
 
 type Role struct {
 	ID          int64
+	ClubID      int64
 	Name        string
 	Permissions Permissions
 	Position    int32
 	Color       int32
+	UpdatedAt   time.Time
 }
 
 func (r *Role) ToRoleProto() *clubv1.Role {

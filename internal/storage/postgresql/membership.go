@@ -2,9 +2,13 @@ package postgresql
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
+	"strconv"
 	"time"
 )
 
@@ -181,7 +185,7 @@ func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*doma
 	err = tx.QueryRowContext(ctx, query, args...).Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color)
 	if err != nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("%s: failed to insert president role: %w", op, err)
+		return nil, fmt.Errorf("%s: failed to insert role: %w", op, err)
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -189,4 +193,104 @@ func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*doma
 	}
 
 	return &role, nil
+}
+
+func (s *Storage) DeleteRoleByID(ctx context.Context, clubID, roleID int64) error {
+	const op = "storage.postgresql.DeleteRoleByID"
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	// Defer the rollback in case of any error.
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM users_roles WHERE role_id = $1`, roleID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete members of the role: %w", op, err)
+	}
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM roles WHERE id = $1 AND club_id = $2`, roleID, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete role: %w", op, err)
+	}
+
+	// Check the number of rows affected
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to get rows affected from delete: %w", op, err)
+	}
+
+	if rowsAffected == 0 {
+		tx.Rollback()
+		return fmt.Errorf("%s: no rows deleted, club or role may not exist: %w", op, storage.ErrClubOrRoleNotExists)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+	}
+
+	return nil
+}
+
+func (s *Storage) GetRoleByID(ctx context.Context, clubID, roleID int64) (*domain.Role, error) {
+	const op = "storage.postgresql.GetRoleByID"
+
+	query := `
+		SELECT id, name, permissions, position, color, updated_at
+		FROM roles
+		WHERE id = $1 AND club_id = $2
+	`
+
+	var role domain.Role
+
+	err := s.DB.QueryRowContext(ctx, query, roleID, clubID).Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color, &role.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrClubOrRoleNotExists
+		}
+
+		return nil, fmt.Errorf("%s: failed to get a role: %w", op, err)
+	}
+
+	return &role, nil
+
+}
+
+func (s *Storage) UpdateRole(ctx context.Context, role *domain.Role) error {
+	const op = "storage.postgresql.UpdateRole"
+
+	query := `
+		UPDATE roles 
+		SET name = $3, permissions = $4, position = $5, color = $6
+		WHERE id = $1 AND club_id = $2 AND updated_at = $7
+		returning updated_at
+	`
+
+	args := []any{
+		role.ID, role.ClubID, role.Name,
+		strconv.FormatUint(role.Permissions.PermissionsHex, 10), role.Position,
+		role.Color, role.UpdatedAt,
+	}
+
+	err := s.DB.QueryRowContext(ctx, query, args...).Scan(&role.UpdatedAt)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return storage.ErrEditConflict
+		default:
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	return nil
 }

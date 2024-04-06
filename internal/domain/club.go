@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+const (
+	MaxClubNameLen        = 75
+	MinClubNameLen        = 4
+	MaxClubDescriptionLen = 2500
+	MinClubDescriptionLen = 4
+	MaxClubTypeLen        = 75
+	MinClubTypeLen        = 4
+)
+
 type Club struct {
 	ID           int64
 	Name         string

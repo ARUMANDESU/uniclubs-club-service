@@ -7,7 +7,6 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
-	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -72,6 +71,9 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Name, validation.Length(domain.MinClubNameLen, domain.MaxClubNameLen)),
+		validation.Field(&req.Description, validation.Length(domain.MinClubDescriptionLen, domain.MaxClubDescriptionLen)),
+		validation.Field(&req.ClubType, validation.Length(domain.MinClubTypeLen, domain.MaxClubTypeLen)),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -110,7 +112,7 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 
 	err = s.management.UpdateClub(ctx, club)
 	if err != nil {
-		if errors.Is(err, storage.ErrEditConflict) {
+		if errors.Is(err, management.ErrEditConflict) {
 			return nil, status.Error(codes.Aborted, ErrEditConflict.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
