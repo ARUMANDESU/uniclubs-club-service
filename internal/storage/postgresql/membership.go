@@ -218,22 +218,22 @@ func (s *Storage) DeleteRoleByID(ctx context.Context, clubID, roleID int64) erro
 		return fmt.Errorf("%s: failed to delete members of the role: %w", op, err)
 	}
 
-	result, err := tx.ExecContext(ctx, `DELETE FROM roles WHERE id = $1 AND club_id = $2`, roleID, clubID)
+	var rolePos int
+
+	err = tx.QueryRowContext(ctx, `DELETE FROM roles WHERE id = $1 AND club_id = $2 RETURNING position`, roleID, clubID).Scan(&rolePos)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
+			return storage.ErrClubOrRoleNotExists
+		}
 		tx.Rollback()
 		return fmt.Errorf("%s: failed to delete role: %w", op, err)
 	}
 
-	// Check the number of rows affected
-	rowsAffected, err := result.RowsAffected()
+	_, err = tx.ExecContext(ctx, `UPDATE roles SET position = position - 1 WHERE club_id = $1 and name != 'member' AND position > $2`, clubID, rolePos)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to get rows affected from delete: %w", op, err)
-	}
-
-	if rowsAffected == 0 {
-		tx.Rollback()
-		return fmt.Errorf("%s: no rows deleted, club or role may not exist: %w", op, storage.ErrClubOrRoleNotExists)
+		return fmt.Errorf("%s: failed to decrement upper roles: %w", op, err)
 	}
 
 	if err = tx.Commit(); err != nil {
