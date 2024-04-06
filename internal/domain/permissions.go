@@ -30,6 +30,15 @@ var Values = map[string]uint64{
 	"ManageRoles":      ManageRoles,
 }
 
+var PermissionList = []string{
+	"Administrator",
+	"ManageClub",
+	"ManageMembership",
+	"KickMember",
+	"BanMember",
+	"ManageRoles",
+}
+
 type Permissions struct {
 	PermissionsHex uint64
 	PermissionsArr []string

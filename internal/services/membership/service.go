@@ -68,7 +68,7 @@ func (s Service) RejectMembership(ctx context.Context, clubID, userID int64) err
 }
 
 func (s Service) CreateNewRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error) {
-	const op = "services.membership.RejectMembership"
+	const op = "services.membership.CreateNewRole"
 	log := s.log.With(slog.String("op", op))
 
 	role, err := s.storage.CreateRole(ctx, dto)
@@ -76,8 +76,6 @@ func (s Service) CreateNewRole(ctx context.Context, dto dtos.CreateRoleDTO) (*do
 		log.Error("failed to create new role", logger.Err(err))
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-
-	log.Info("how?", slog.Any("role: ", role))
 
 	return role, nil
 }

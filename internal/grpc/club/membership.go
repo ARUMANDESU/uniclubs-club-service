@@ -81,6 +81,13 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.Name, validation.Required, validation.Length(4, 75)),
+		validation.Field(&req.Permissions, validation.Each(validation.In(
+			"Administrator",
+			"ManageClub",
+			"ManageMembership",
+			"KickMember",
+			"BanMember",
+			"ManageRoles"))),
 		validation.Field(&req.Position, validation.Required, validation.Min(1)),
 		validation.Field(&req.Color, validation.Required),
 	)

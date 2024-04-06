@@ -159,7 +159,7 @@ func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*doma
 		}
 	}()
 
-	_, err = tx.ExecContext(ctx, `UPDATE roles SET position = position + 1 WHERE club_id = $1`, dto.ClubID)
+	_, err = tx.ExecContext(ctx, `UPDATE roles SET position = position + 1 WHERE club_id = $1 and name != 'member'`, dto.ClubID)
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("%s: failed to increment roles position: %w", op, err)
@@ -182,6 +182,10 @@ func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*doma
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("%s: failed to insert president role: %w", op, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("%s: transaction commit failed: %w", op, err)
 	}
 
 	return &role, nil

@@ -25,6 +25,7 @@ func (c Club) ToClubObject() *clubv1.ClubObject {
 	for i, role := range c.Roles {
 		role.Permissions.HexToStringArr()
 		roles[i] = &clubv1.Role{
+			Id:          role.ID,
 			Name:        role.Name,
 			Permissions: role.Permissions.PermissionsArr,
 			Position:    role.Position,
