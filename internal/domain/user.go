@@ -3,13 +3,13 @@ package domain
 import clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 
 type User struct {
-	ID        int64  `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Barcode   string `json:"barcode"`
-	AvatarURL string `json:"avatar_url"`
-	Roles     []int64
+	ID        int64   `json:"id"`
+	Email     string  `json:"email"`
+	FirstName string  `json:"first_name"`
+	LastName  string  `json:"last_name"`
+	Barcode   string  `json:"barcode"`
+	AvatarURL string  `json:"avatar_url"`
+	Roles     []int64 `json:"roles"`
 }
 
 func (u User) ToUserObject() *clubv1.UserObject {

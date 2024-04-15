@@ -422,3 +422,58 @@ func (s *Storage) AddRoleMembers(ctx context.Context, clubID, roleID int64, user
 
 	return nil
 }
+
+func (s *Storage) RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error {
+	const op = "storage.postgresql.AddRoleMembers"
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	// Defer the rollback in case of any error.
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM clubs_users WHERE user_id = $1 AND club_id = $2`, userID, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete member from the club: %w", op, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to get rows affected from delete: %w", op, err)
+	}
+
+	if rowsAffected == 0 {
+		tx.Rollback()
+		return fmt.Errorf("%s: no rows updated, club or member may not exist: %w", op, domain.ErrMemberNotFound)
+	}
+
+	result, err = tx.ExecContext(ctx, `DELETE FROM users_roles ur USING roles r  WHERE ur.role_id = r.id AND ur.user_id = $1 AND r.club_id = $2`, userID, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to remove roles membership: %w", op, err)
+	}
+	rowsAffected, err = result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to get rows affected from delete: %w", op, err)
+	}
+
+	if rowsAffected == 0 {
+		tx.Rollback()
+		return fmt.Errorf("%s: no rows deleted, club or member or roles may not exist: %w", op, domain.ErrMemberNotFound)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+	}
+
+	return nil
+}

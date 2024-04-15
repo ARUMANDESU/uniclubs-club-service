@@ -26,6 +26,7 @@ type MembershipService interface {
 	UpdateRole(ctx context.Context, role *domain.Role) error
 	ChangeRolesPosition(ctx context.Context, clubID int64, dto []*dtos.ChangeRolesPositionDTO) ([]*domain.Role, error)
 	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
+	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
 }
 
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
@@ -79,8 +80,24 @@ func (s serverApi) HandleJoinClub(ctx context.Context, req *clubv1.HandleJoinClu
 	return &empty.Empty{}, nil
 }
 
-func (s serverApi) LeaveClub(context.Context, *clubv1.LeaveClubRequest) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LeaveClub not implemented")
+func (s serverApi) LeaveClub(ctx context.Context, req *clubv1.LeaveClubRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = s.membership.RemoveMemberFromClub(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, domain.ErrMemberNotFound) {
+			return nil, status.Error(codes.NotFound, domain.ErrMemberNotFound.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return nil, nil
 }
 
 func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest) (*clubv1.Role, error) {

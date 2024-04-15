@@ -32,6 +32,7 @@ type Storage interface {
 	ChangeRolesPosition(ctx context.Context, dto []*dtos.ChangeRolesPositionDTO) error
 	GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*domain.Role, error)
 	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
+	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -192,4 +193,21 @@ func (s Service) AddRoleMembers(ctx context.Context, clubID, roleID int64, users
 
 	return nil
 
+}
+
+func (s Service) RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error {
+	const op = "services.membership.RemoveMemberFromClub"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.RemoveMemberFromClub(ctx, clubID, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMemberNotFound) {
+			log.Debug("err member not found", logger.Err(err))
+			return err
+		}
+		log.Error("failed to remove member from club", logger.Err(err))
+		return err
+	}
+
+	return nil
 }
