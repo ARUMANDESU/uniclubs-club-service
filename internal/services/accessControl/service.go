@@ -190,3 +190,49 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 	return true, nil
 
 }
+
+func (s *Service) CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID, userID, roleID int64) (bool, error) {
+	const op = "service.accessControl.canEditRoleAndMembersAndDeleteRole"
+	log := s.log.With(slog.String("op", op))
+
+	role, err := s.storage.GetRoleByID(ctx, clubID, roleID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubOrRoleNotExists) {
+			return false, ErrClubOrRoleNotExists
+		}
+		log.Error("failed to get role by id", logger.Err(err))
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	userRoles, isUserOwner, err := s.storage.GetUserRoles(ctx, clubID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			log.Error("user is not club member", logger.Err(err))
+			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+		default:
+			log.Error("failed to get user permissions", logger.Err(err))
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
+	}
+	if isUserOwner {
+		return true, nil
+	}
+	userPermissions := domain.AccumulatePermissions(userRoles)
+
+	if !domain.HasPermission(userPermissions, domain.ManageRoles) {
+		return false, fmt.Errorf("%s: %w", domain.Names[domain.ManageRoles], domain.ErrMemberNotHavePermissions)
+	}
+
+	userHighestRolePos, err := domain.GetHighestRolePosition(userRoles)
+	if err != nil {
+		log.Error("failed to get user's highest role position", logger.Err(err))
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if userHighestRolePos <= role.Position {
+		return false, fmt.Errorf("%w: %d", domain.ErrMemberNotHavePermissionsToEditRole, role.ID)
+	}
+
+	return true, nil
+}
