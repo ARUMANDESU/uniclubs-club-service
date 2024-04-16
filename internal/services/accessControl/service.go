@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
@@ -192,7 +193,7 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 }
 
 func (s *Service) CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID, userID, roleID int64) (bool, error) {
-	const op = "service.accessControl.canEditRoleAndMembersAndDeleteRole"
+	const op = "service.accessControl.CanEditRoleAndMembersAndDeleteRole"
 	log := s.log.With(slog.String("op", op))
 
 	role, err := s.storage.GetRoleByID(ctx, clubID, roleID)
@@ -235,4 +236,56 @@ func (s *Service) CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID
 	}
 
 	return true, nil
+}
+
+func (s *Service) CanChangeRolesPositions(ctx context.Context, clubID, userID int64, roles []*dtos.ChangeRolesPositionDTO) (bool, error) {
+	const op = "service.accessControl.CanChangeRolesPositions"
+	log := s.log.With(slog.String("op", op))
+
+	clubRoles, err := s.storage.GetClubRoles(ctx, clubID)
+	if err != nil {
+		log.Error("failed to get club's roles", logger.Err(err))
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	userRoles, isUserOwner, err := s.storage.GetUserRoles(ctx, clubID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			log.Error("user is not club member", logger.Err(err))
+			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+		default:
+			log.Error("failed to get user permissions", logger.Err(err))
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
+	}
+	if isUserOwner {
+		return true, nil
+	}
+	userPermissions := domain.AccumulatePermissions(userRoles)
+
+	if !domain.HasPermission(userPermissions, domain.ManageRoles) {
+		return false, fmt.Errorf("%s: %w", domain.Names[domain.ManageRoles], domain.ErrMemberNotHavePermissions)
+	}
+
+	userHighestRolePos, err := domain.GetHighestRolePosition(userRoles)
+	if err != nil {
+		log.Error("failed to get user's highest role position", logger.Err(err))
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	rolesPosMap := make(map[int64]int32)
+
+	for _, role := range clubRoles {
+		rolesPosMap[role.ID] = role.Position
+	}
+
+	for _, role := range roles {
+		if rolesPosMap[role.RoleID] >= userHighestRolePos && role.Position >= userHighestRolePos {
+			return false, fmt.Errorf("%w: %d", domain.ErrMemberNotHavePermissionsToEditRole, role.RoleID)
+		}
+	}
+
+	return true, nil
+
 }
