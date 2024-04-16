@@ -321,3 +321,29 @@ func (s serverApi) AddRoleMembers(ctx context.Context, req *clubv1.AddRoleMember
 
 	return &empty.Empty{}, nil
 }
+
+func (s serverApi) RemoveRoleMembers(ctx context.Context, req *clubv1.RemoveRoleMembersRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.RoleId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UsersId, validation.Required, validation.Each(validation.Min(1))),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	// TODO: implement this shit
+	panic("implement me")
+}

@@ -58,6 +58,19 @@ func (p *Permissions) HexToStringArr() error {
 	return nil
 }
 
+func PermissionsHexToStringArr(p uint64) []string {
+	var permissions []string
+	// Iterate over all possible permissions
+	for bit, name := range Names {
+		// Check if the permission bit is set
+		if p&bit != 0 {
+			permissions = append(permissions, name)
+		}
+	}
+
+	return permissions
+}
+
 func StringArrToHex(p []string) (uint64, error) {
 	const op = "domain.permission.StringArrToHex"
 
@@ -86,4 +99,13 @@ func AccumulatePermissions(roles []*Role) (accumulatedPermissions uint64) {
 
 func HasPermission(userPermissions uint64, permission uint64) bool {
 	return userPermissions&permission != 0
+}
+
+func UserHasPermissions(userPermissions uint64, permissions uint64) (bool, error) {
+	res := userPermissions&permissions == permissions
+	if !res {
+		doNotHavePermsArr := PermissionsHexToStringArr(userPermissions ^ permissions)
+		return false, fmt.Errorf("%v: %w", doNotHavePermsArr, ErrMemborNotHavePermissions)
+	}
+	return res, nil
 }

@@ -66,3 +66,38 @@ func (s *Storage) GetUserRoles(ctx context.Context, clubID, userID int64) (roles
 
 	return roles, isOwner, nil
 }
+
+func (s *Storage) GetClubRoles(ctx context.Context, clubID int64) ([]*domain.Role, error) {
+	const op = "storage.postgresql.GetClubRoles"
+
+	query := `
+		SELECT id, name, position, permissions, color
+    	FROM roles 
+		WHERE club_id = $1
+    `
+
+	rows, err := s.DB.QueryContext(ctx, query, clubID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	var roles []*domain.Role
+
+	for rows.Next() {
+		var role domain.Role
+
+		err := rows.Scan(&role.ID, &role.Name, &role.Position, &role.Permissions.PermissionsHex, &role.Color)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+
+		roles = append(roles, &role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: iterating and scanning roles: %w", op, err)
+	}
+
+	return roles, nil
+
+}

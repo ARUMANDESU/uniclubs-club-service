@@ -11,6 +11,7 @@ var (
 		ErrUserNotClubMember     = errors.New("user is not club member")
 		ErrEditConflict          = errors.New("unable to update the record due to an edit conflict, please try again")
 		ErrUserNonAuthorized     = errors.New("user does not have permission")*/
-	ErrUserAlreadyRoleMember = errors.New("user is already a role member")
-	ErrMemberNotFound        = errors.New("member not found")
+	ErrUserAlreadyRoleMember    = errors.New("user is already a role member")
+	ErrMemberNotFound           = errors.New("member not found")
+	ErrMemborNotHavePermissions = errors.New("member does not have permissions")
 )
