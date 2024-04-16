@@ -105,7 +105,7 @@ func UserHasPermissions(userPermissions uint64, permissions uint64) (bool, error
 	res := userPermissions&permissions == permissions
 	if !res {
 		doNotHavePermsArr := PermissionsHexToStringArr(userPermissions ^ permissions)
-		return false, fmt.Errorf("%v: %w", doNotHavePermsArr, ErrMemborNotHavePermissions)
+		return false, fmt.Errorf("%v: %w", doNotHavePermsArr, ErrMemberNotHavePermissions)
 	}
 	return res, nil
 }

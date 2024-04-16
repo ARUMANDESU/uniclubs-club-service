@@ -158,7 +158,7 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 	userPermissions := domain.AccumulatePermissions(userRoles)
 
 	if !domain.HasPermission(userPermissions, domain.ManageRoles) {
-		return false, nil
+		return false, fmt.Errorf("%s: %w", domain.Names[domain.ManageRoles], domain.ErrMemberNotHavePermissions)
 	}
 
 	userHighestRolePos, err := domain.GetHighestRolePosition(userRoles)
@@ -168,7 +168,7 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 	}
 
 	if userHighestRolePos <= role.Position {
-		return false, nil
+		return false, fmt.Errorf("%w: %d", domain.ErrMemberNotHavePermissionsToEditRole, role.ID)
 	}
 
 	if permissions != nil {
