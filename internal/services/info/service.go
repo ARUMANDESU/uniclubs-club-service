@@ -7,6 +7,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
+	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	"log/slog"
 )
 
@@ -26,6 +27,7 @@ type Storage interface {
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	GetUserClubsByID(ctx context.Context, userID int64) ([]*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
+	HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	ListClubs(
 		ctx context.Context,
 		query string,
@@ -79,7 +81,7 @@ func (s Service) GetMemberByID(ctx context.Context, clubID, userID int64) (*doma
 
 	member, err := s.storage.GetMemberByID(ctx, clubID, userID)
 	if err != nil {
-		if errors.Is(err, storage.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, fmt.Errorf("%s: %w", op, domain.ErrMemberNotFound)
 		}
 		log.Error("failed to get member by ID", logger.Err(err))
@@ -173,6 +175,27 @@ func (s Service) ListMembershipRequests(ctx context.Context, clubID int64, filte
 	return users, metadata, nil
 }
 
-func (s Service) GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) (*domain.User, error) {
-	panic("implement me")
+func (s Service) GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) (clubv1.JoinStatus, error) {
+	const op = "services.info.GetJoinStatusOfUser"
+	log := s.log.With(slog.String("op", op))
+
+	member, err := s.storage.GetMemberByID(ctx, clubID, userID)
+	if err != nil && !errors.Is(err, domain.ErrUserNotClubMember) {
+		log.Error("failed to get club member", logger.Err(err))
+		return clubv1.JoinStatus_NOT_MEMBER, fmt.Errorf("%s: %w", op, err)
+	}
+	if member != nil {
+		return clubv1.JoinStatus_MEMBER, nil
+	}
+
+	haveUserJoinRequest, err := s.storage.HaveUserJoinRequest(ctx, clubID, userID)
+	if err != nil {
+		log.Error("failed to get info about user join request")
+		return clubv1.JoinStatus_NOT_MEMBER, fmt.Errorf("%s: %w", op, err)
+	}
+	if haveUserJoinRequest {
+		return clubv1.JoinStatus_PENDING, nil
+	}
+
+	return clubv1.JoinStatus_NOT_MEMBER, nil
 }

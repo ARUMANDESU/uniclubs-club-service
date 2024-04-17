@@ -39,10 +39,11 @@ func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJ
 	err = s.membership.CreateJoinRequest(ctx, req.GetUserId(), req.GetClubId())
 	if err != nil {
 		switch {
-		case errors.Is(err, domain.ErrUserAlreadyClubMember):
+		case errors.Is(err, domain.ErrUserAlreadyClubMember), errors.Is(err, domain.ErrUserAlreadySentJoinRequest):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 
 	return &empty.Empty{}, nil

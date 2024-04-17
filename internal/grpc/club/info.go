@@ -16,7 +16,7 @@ type InfoService interface {
 	GetUserClubs(ctx context.Context, userID int64) ([]*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
-	GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) (*domain.User, error)
+	GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) (clubv1.JoinStatus, error)
 	ListClub(
 		ctx context.Context,
 		query string, clubTypes []string,
@@ -225,5 +225,18 @@ func (s serverApi) GetClubMember(ctx context.Context, req *clubv1.GetClubMemberR
 }
 
 func (s serverApi) GetJoinStatus(ctx context.Context, req *clubv1.GetJoinStatusRequest) (*clubv1.GetJoinStatusResponse, error) {
-	panic("implement me")
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	joinStatus, err := s.info.GetJoinStatusOfUser(ctx, req.GetClubId(), req.GetUserId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &clubv1.GetJoinStatusResponse{Status: joinStatus}, nil
 }

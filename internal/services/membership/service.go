@@ -34,6 +34,7 @@ type Storage interface {
 	GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*domain.Role, error)
 	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
+	HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -48,15 +49,24 @@ func (s Service) CreateJoinRequest(ctx context.Context, userID, clubID int64) er
 	log := s.log.With(slog.String("op", op))
 
 	member, err := s.storage.GetMemberByID(ctx, clubID, userID)
-	if err != nil {
+	if err != nil && !errors.Is(err, domain.ErrUserNotClubMember) {
+		log.Error("failed to get club member", logger.Err(err))
 		return fmt.Errorf("%s: %w", op, err)
 	}
-
 	if member != nil {
 		return domain.ErrUserAlreadyClubMember
 	}
 
-	err = s.storage.InsertJoinRequest(ctx, member.ID, clubID)
+	haveUserJoinRequest, err := s.storage.HaveUserJoinRequest(ctx, clubID, userID)
+	if err != nil {
+		log.Error("failed to get info about user join request")
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if haveUserJoinRequest {
+		return domain.ErrUserAlreadySentJoinRequest
+	}
+
+	err = s.storage.InsertJoinRequest(ctx, userID, clubID)
 	if err != nil {
 		log.Error("failed to create new join request", logger.Err(err))
 		return err

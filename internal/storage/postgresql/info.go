@@ -81,10 +81,7 @@ func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*dom
 		WHERE cu.club_id = $1 and u.id = $2;
 	`)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("%s: %w", op, storage.ErrUserNotClubMember)
-		}
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%slox:: %w", op, err)
 	}
 
 	defer stmt.Close()
@@ -96,6 +93,9 @@ func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*dom
 
 	err = stmt.QueryRowContext(ctx, clubID, userID).Scan(&user.ID, &user.Email, &user.Barcode, &user.FirstName, &user.LastName, &user.AvatarURL)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -434,4 +434,26 @@ func (s *Storage) ListMembershipRequests(ctx context.Context, clubID int64, filt
 	metadata := domain.CalculateMetadata(totalRecords, filters.Page, filters.PageSize)
 
 	return users, &metadata, nil
+}
+
+func (s *Storage) HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error) {
+	const op = "storage.postgresql.HaveUserJoinRequest"
+
+	query := `
+		SELECT id 
+		FROM join_club_requests
+		where user_id = $1 AND club_id = $2
+	`
+
+	var joinID int64
+
+	err := s.DB.QueryRowContext(ctx, query, userID, clubID).Scan(&joinID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return joinID != 0, nil
 }

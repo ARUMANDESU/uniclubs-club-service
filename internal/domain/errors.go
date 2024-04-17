@@ -13,6 +13,7 @@ var (
 		ErrUserNonAuthorized     = errors.New("user does not have permission")*/
 	ErrUserAlreadyRoleMember                  = errors.New("user is already a role member")
 	ErrUserAlreadyClubMember                  = errors.New("user is already a club member")
+	ErrUserAlreadySentJoinRequest             = errors.New("user already sent join request to the club")
 	ErrMemberNotFound                         = errors.New("member not found")
 	ErrMemberNotHavePermissions               = errors.New("member does not have these permissions")
 	ErrMemberNotHavePermissionsToEditRole     = errors.New("member does not have permissions to change role by id")
