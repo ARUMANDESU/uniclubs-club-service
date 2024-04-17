@@ -172,15 +172,13 @@ func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*doma
 
 	query := `
 		INSERT INTO roles(club_id, name, permissions, position, color) 
-		VALUES($1, $2, $3, $4, $5)
+		VALUES($1, $2, 0, 1, $3)
 		RETURNING id, name, permissions, position, color`
 
 	var role domain.Role
 
 	args := []any{
-		dto.ClubID, dto.Name,
-		dto.Permissions, dto.Position,
-		dto.Color,
+		dto.ClubID, dto.Name, dto.Color,
 	}
 
 	err = tx.QueryRowContext(ctx, query, args...).Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color)

@@ -12,7 +12,6 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"strconv"
 )
 
 type MembershipService interface {
@@ -104,14 +103,6 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.Name, validation.Required, validation.Length(domain.MinClubNameLen, domain.MaxClubNameLen)),
-		validation.Field(&req.Permissions, validation.Each(validation.In(
-			"Administrator",
-			"ManageClub",
-			"ManageMembership",
-			"KickMember",
-			"BanMember",
-			"ManageRoles"))),
-		validation.Field(&req.Position, validation.Required, validation.Min(1)),
 		validation.Field(&req.Color, validation.Required, validation.Min(0)),
 	)
 	if err != nil {
@@ -129,18 +120,11 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
 	}
 
-	hexPerms, err := domain.StringArrToHex(req.Permissions)
-	if err != nil {
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
-	}
-
 	dto := dtos.CreateRoleDTO{
-		ClubID:      req.GetClubId(),
-		UserID:      req.GetUserId(),
-		Name:        req.GetName(),
-		Position:    1,
-		Permissions: strconv.FormatUint(hexPerms, 10),
-		Color:       req.GetColor(),
+		ClubID: req.GetClubId(),
+		UserID: req.GetUserId(),
+		Name:   req.GetName(),
+		Color:  req.GetColor(),
 	}
 
 	role, err := s.membership.CreateNewRole(ctx, dto)

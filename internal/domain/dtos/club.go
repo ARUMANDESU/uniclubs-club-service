@@ -10,12 +10,10 @@ type CreateClubDTO struct {
 }
 
 type CreateRoleDTO struct {
-	ClubID      int64
-	UserID      int64
-	Name        string
-	Position    int32
-	Permissions string
-	Color       int32
+	ClubID int64
+	UserID int64
+	Name   string
+	Color  int32
 }
 
 type ChangeRolesPositionDTO struct {
