@@ -3,6 +3,7 @@ package club
 import (
 	"context"
 	"errors"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	"google.golang.org/grpc"
 )
@@ -30,6 +31,9 @@ type PermissionService interface {
 	CanHandleMembershipRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	CanManageClub(ctx context.Context, clubID, userID int64) (bool, error)
 	CanManageRoles(ctx context.Context, clubID, userID int64) (bool, error)
+	CanUpdateRole(ctx context.Context, clubID, userID, roleID int64, permissions []string) (bool, error)
+	CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID, userID, roleID int64) (bool, error)
+	CanChangeRolesPositions(ctx context.Context, clubID, userID int64, roles []*dtos.ChangeRolesPositionDTO) (bool, error)
 }
 
 func Register(

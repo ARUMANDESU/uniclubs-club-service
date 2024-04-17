@@ -72,7 +72,7 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 }
 
 func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error) {
-	const op = "storage.postgresql.GetUserByID"
+	const op = "storage.postgresql.GetMemberByID"
 
 	stmt, err := s.DB.Prepare(`
 		SELECT u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url

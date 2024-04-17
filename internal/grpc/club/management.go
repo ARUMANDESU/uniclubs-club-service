@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
-	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -81,7 +80,7 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 
 	isAuthorized, err := s.permission.CanManageClub(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
@@ -134,7 +133,7 @@ func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest
 
 	isAuthorized, err := s.permission.CanManageClub(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
@@ -170,7 +169,7 @@ func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerReq
 
 	isAuthorized, err := s.permission.CanManageClub(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())

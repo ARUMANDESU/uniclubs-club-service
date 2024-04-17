@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
-	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/accessControl"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/membership"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
@@ -58,7 +57,7 @@ func (s serverApi) HandleJoinClub(ctx context.Context, req *clubv1.HandleJoinClu
 
 	isAuthorized, err := s.permission.CanHandleMembershipRequest(ctx, req.GetClubId(), req.GetMemberId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
@@ -121,7 +120,7 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 
 	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
@@ -171,12 +170,20 @@ func (s serverApi) UpdateRole(ctx context.Context, req *clubv1.UpdateRoleRequest
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	isAuthorized, err := s.permission.CanUpdateRole(ctx, req.GetClubId(), req.GetUserId(), req.GetRoleId(), req.GetPermissions())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		switch {
+		case errors.Is(err, domain.ErrClubOrRoleNotExists):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		case errors.Is(err, domain.ErrMemberNotHavePermissions), errors.Is(err, domain.ErrMemberNotHavePermissionsToEditRole):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		case errors.Is(err, domain.ErrMemberNotHaveAccessToRemovePermissions):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 	if !isAuthorized {
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
@@ -229,12 +236,18 @@ func (s serverApi) DeleteRole(ctx context.Context, req *clubv1.DeleteRoleRequest
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	isAuthorized, err := s.permission.CanEditRoleAndMembersAndDeleteRole(ctx, req.GetClubId(), req.GetUserId(), req.GetRoleId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		switch {
+		case errors.Is(err, domain.ErrClubOrRoleNotExists):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		case errors.Is(err, domain.ErrMemberNotHavePermissions), errors.Is(err, domain.ErrMemberNotHavePermissionsToEditRole):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 	if !isAuthorized {
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
@@ -262,9 +275,11 @@ func (s serverApi) ChangeRolesPosition(ctx context.Context, req *clubv1.ChangeRo
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	rolesDTO := dtos.MapToChangeRolesPositionDTOArr(req.Roles)
+
+	isAuthorized, err := s.permission.CanChangeRolesPositions(ctx, req.GetClubId(), req.GetUserId(), rolesDTO)
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
@@ -273,7 +288,7 @@ func (s serverApi) ChangeRolesPosition(ctx context.Context, req *clubv1.ChangeRo
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
 	}
 
-	roles, err := s.membership.ChangeRolesPosition(ctx, req.GetClubId(), dtos.MapToChangeRolesPositionDTOArr(req.Roles))
+	roles, err := s.membership.ChangeRolesPosition(ctx, req.GetClubId(), rolesDTO)
 	if err != nil {
 		if errors.Is(err, membership.ErrClubOrRoleNotExists) {
 			return nil, status.Error(codes.NotFound, ErrClubOrRoleNotExists.Error())
@@ -295,12 +310,18 @@ func (s serverApi) AddRoleMembers(ctx context.Context, req *clubv1.AddRoleMember
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	isAuthorized, err := s.permission.CanEditRoleAndMembersAndDeleteRole(ctx, req.GetClubId(), req.GetUserId(), req.GetRoleId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		switch {
+		case errors.Is(err, domain.ErrClubOrRoleNotExists):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		case errors.Is(err, domain.ErrMemberNotHavePermissions), errors.Is(err, domain.ErrMemberNotHavePermissionsToEditRole):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 	if !isAuthorized {
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
@@ -333,9 +354,9 @@ func (s serverApi) RemoveRoleMembers(ctx context.Context, req *clubv1.RemoveRole
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	isAuthorized, err := s.permission.CanManageRoles(ctx, req.GetClubId(), req.GetUserId())
+	isAuthorized, err := s.permission.CanEditRoleAndMembersAndDeleteRole(ctx, req.GetClubId(), req.GetUserId(), req.GetRoleId())
 	if err != nil {
-		if errors.Is(err, accessControl.ErrUserNotClubMember) {
+		if errors.Is(err, domain.ErrUserNotClubMember) {
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())

@@ -11,13 +11,6 @@ import (
 	"log/slog"
 )
 
-var (
-	ErrInsufficientRolePosition = errors.New("user's highest role position is less than target's")
-	ErrUserNotClubMember        = errors.New("user is not club member")
-	ErrTargetNotClubMember      = errors.New("target user is not club member")
-	ErrClubOrRoleNotExists      = errors.New("club or role does not exists")
-)
-
 type Service struct {
 	log     *slog.Logger
 	storage Storage
@@ -45,7 +38,7 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
 			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -61,7 +54,7 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
 			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, ErrTargetNotClubMember)
+			return false, fmt.Errorf("%s: %w", op, domain.ErrTargetNotClubMember)
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -84,8 +77,8 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 	}
 
 	if userHighestPos < targetHighestPos {
-		log.Error(ErrInsufficientRolePosition.Error())
-		return false, fmt.Errorf("%s: %w", op, ErrInsufficientRolePosition)
+		log.Error(domain.ErrInsufficientRolePosition.Error())
+		return false, fmt.Errorf("%s: %w", op, domain.ErrInsufficientRolePosition)
 	}
 
 	userPermissions := domain.AccumulatePermissions(userRoles)
@@ -102,7 +95,7 @@ func (s *Service) HavePermissionTo(ctx context.Context, clubID, userID int64, pe
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
 			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -136,7 +129,7 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 	role, err := s.storage.GetRoleByID(ctx, clubID, roleID)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubOrRoleNotExists) {
-			return false, ErrClubOrRoleNotExists
+			return false, domain.ErrClubOrRoleNotExists
 		}
 		log.Error("failed to get role by id", logger.Err(err))
 		return false, fmt.Errorf("%s: %w", op, err)
@@ -147,7 +140,7 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
 			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -179,13 +172,25 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 			return false, fmt.Errorf("%s: %w", op, err)
 		}
 
-		hasPermissions, err := domain.UserHasPermissions(userPermissions, permissionsHex)
-		if err != nil {
-			return false, err
+		// if user does not have permissions that update perms have but roles perms have missing perms then pass else return ErrMemberNotHavePermissions
+		userMissingPerms := domain.MissingPermissions(userPermissions, permissionsHex)
+		if userMissingPerms != 0 {
+			userMissingRoleMissing := domain.MissingPermissions(role.Permissions.PermissionsHex, userMissingPerms)
+			if userMissingRoleMissing != 0 {
+				return false, fmt.Errorf("%w: %v", domain.ErrMemberNotHavePermissions, domain.PermissionsHexToStringArr(userMissingRoleMissing))
+			}
+
 		}
-		if !hasPermissions {
-			return false, nil
+
+		// update perms must have perms that role have if user does not
+		userRoleMissingPerms := domain.MissingPermissions(userPermissions, role.Permissions.PermissionsHex)
+		if userRoleMissingPerms != 0 {
+			updateMissingPerms := domain.MissingPermissions(permissionsHex, userRoleMissingPerms)
+			if updateMissingPerms != 0 {
+				return false, fmt.Errorf("%w: %v", domain.ErrMemberNotHaveAccessToRemovePermissions, domain.PermissionsHexToStringArr(updateMissingPerms))
+			}
 		}
+
 	}
 
 	return true, nil
@@ -199,7 +204,7 @@ func (s *Service) CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID
 	role, err := s.storage.GetRoleByID(ctx, clubID, roleID)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubOrRoleNotExists) {
-			return false, ErrClubOrRoleNotExists
+			return false, domain.ErrClubOrRoleNotExists
 		}
 		log.Error("failed to get role by id", logger.Err(err))
 		return false, fmt.Errorf("%s: %w", op, err)
@@ -209,8 +214,7 @@ func (s *Service) CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -253,7 +257,7 @@ func (s *Service) CanChangeRolesPositions(ctx context.Context, clubID, userID in
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
 			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
