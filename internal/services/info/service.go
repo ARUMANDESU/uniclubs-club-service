@@ -23,6 +23,7 @@ type Service struct {
 
 type Storage interface {
 	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
+	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	GetUserClubsByID(ctx context.Context, userID int64) ([]*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 	ListClubs(
@@ -63,7 +64,6 @@ func (s Service) GetClub(ctx context.Context, clubID int64) (*domain.Club, error
 	club, err := s.storage.GetClubByID(ctx, clubID)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
-			log.Error("club does not exists", logger.Err(err))
 			return nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
 		}
 		log.Error("failed to get club by ID", logger.Err(err))
@@ -71,6 +71,22 @@ func (s Service) GetClub(ctx context.Context, clubID int64) (*domain.Club, error
 	}
 
 	return club, nil
+}
+
+func (s Service) GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error) {
+	const op = "services.info.GetMemberByID"
+	log := s.log.With(slog.String("op", op))
+
+	member, err := s.storage.GetMemberByID(ctx, clubID, userID)
+	if err != nil {
+		if errors.Is(err, storage.ErrUserNotClubMember) {
+			return nil, fmt.Errorf("%s: %w", op, domain.ErrMemberNotFound)
+		}
+		log.Error("failed to get member by ID", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return member, nil
 }
 
 func (s Service) GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error) {
@@ -81,7 +97,6 @@ func (s Service) GetUserRoles(ctx context.Context, clubID, userID int64) (roles 
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
 			return nil, false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user roles", logger.Err(err))
