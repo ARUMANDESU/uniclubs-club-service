@@ -16,6 +16,7 @@ type InfoService interface {
 	GetUserClubs(ctx context.Context, userID int64) ([]*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
+	GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	ListClub(
 		ctx context.Context,
 		query string, clubTypes []string,

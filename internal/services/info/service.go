@@ -172,3 +172,7 @@ func (s Service) ListMembershipRequests(ctx context.Context, clubID int64, filte
 
 	return users, metadata, nil
 }
+
+func (s Service) GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) (*domain.User, error) {
+	panic("implement me")
+}

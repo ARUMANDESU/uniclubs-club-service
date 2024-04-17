@@ -23,6 +23,7 @@ type Service struct {
 
 type Storage interface {
 	InsertJoinRequest(ctx context.Context, userID, clubID int64) error
+	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	AddNewMember(ctx context.Context, clubID, userID int64) error
 	DeleteJoinRequest(ctx context.Context, clubID, userID int64) error
 	CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*domain.Role, error)
@@ -46,7 +47,16 @@ func (s Service) CreateJoinRequest(ctx context.Context, userID, clubID int64) er
 	const op = "services.membership.CreateJoinRequest"
 	log := s.log.With(slog.String("op", op))
 
-	err := s.storage.InsertJoinRequest(ctx, userID, clubID)
+	member, err := s.storage.GetMemberByID(ctx, clubID, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	if member != nil {
+		return domain.ErrUserAlreadyClubMember
+	}
+
+	err = s.storage.InsertJoinRequest(ctx, member.ID, clubID)
 	if err != nil {
 		log.Error("failed to create new join request", logger.Err(err))
 		return err
