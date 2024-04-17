@@ -101,12 +101,11 @@ func (s *Storage) GetMemberByID(ctx context.Context, clubID, userID int64) (*dom
 
 	rolesQuery := `
         SELECT id
-        FROM users_roles ur 
-        JOIN roles r ON ur.role_id = r.id
-        JOIN clubs_users cu ON ur.user_id = cu.user_id
-        WHERE cu.club_id = $1 and ur.user_id = $2;
+			FROM users_roles ur 
+			JOIN roles r ON ur.role_id = r.id
+			WHERE ur.user_id = $1 AND r.club_id = $2;
     `
-	rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, clubID, user.ID)
+	rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, user.ID, clubID)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed querying roles: %w", op, err)
 	}

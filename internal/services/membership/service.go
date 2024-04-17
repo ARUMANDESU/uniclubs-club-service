@@ -30,11 +30,12 @@ type Storage interface {
 	DeleteRoleByID(ctx context.Context, clubID, roleID int64) error
 	GetRoleByID(ctx context.Context, clubID, roleID int64) (*domain.Role, error)
 	UpdateRole(ctx context.Context, role *domain.Role) error
-	ChangeRolesPosition(ctx context.Context, dto []*dtos.ChangeRolesPositionDTO) error
+	ChangeRolesPosition(ctx context.Context, clubId int64, dto []*dtos.ChangeRolesPositionDTO) error
 	GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*domain.Role, error)
 	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
 	HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error)
+	RemoveRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -175,10 +176,16 @@ func (s Service) ChangeRolesPosition(ctx context.Context, clubID int64, dto []*d
 	const op = "services.membership.ChangeRolesPosition"
 	log := s.log.With(slog.String("op", op))
 
-	err := s.storage.ChangeRolesPosition(ctx, dto)
+	err := s.storage.ChangeRolesPosition(ctx, clubID, dto)
 	if err != nil {
-		log.Error("failed to change roles positions", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
+		switch {
+		case errors.Is(err, domain.ErrCannotEditRoleMember), errors.Is(err, domain.ErrClubOrRoleNotExists):
+			return nil, err
+		default:
+			log.Error("failed to change roles positions", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+
 	}
 
 	roles, err := s.storage.GetRolesOfClubByID(ctx, clubID)
@@ -227,6 +234,26 @@ func (s Service) RemoveMemberFromClub(ctx context.Context, clubID, userID int64)
 		}
 		log.Error("failed to remove member from club", logger.Err(err))
 		return err
+	}
+
+	return nil
+}
+
+func (s Service) RemoveRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error {
+	const op = "services.membership.RemoveRoleMembers"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.RemoveRoleMembers(ctx, clubID, roleID, usersID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember),
+			errors.Is(err, domain.ErrCannotEditRoleMember):
+			return err
+		default:
+			log.Error("failed to add new role members", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
 	}
 
 	return nil

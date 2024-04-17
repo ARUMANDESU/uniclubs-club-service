@@ -25,6 +25,7 @@ type MembershipService interface {
 	ChangeRolesPosition(ctx context.Context, clubID int64, dto []*dtos.ChangeRolesPositionDTO) ([]*domain.Role, error)
 	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
+	RemoveRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 }
 
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
@@ -279,10 +280,15 @@ func (s serverApi) ChangeRolesPosition(ctx context.Context, req *clubv1.ChangeRo
 
 	roles, err := s.membership.ChangeRolesPosition(ctx, req.GetClubId(), rolesDTO)
 	if err != nil {
-		if errors.Is(err, membership.ErrClubOrRoleNotExists) {
+		switch {
+		case errors.Is(err, domain.ErrClubOrRoleNotExists):
 			return nil, status.Error(codes.NotFound, ErrClubOrRoleNotExists.Error())
+		case errors.Is(err, domain.ErrCannotEditRoleMember):
+			return nil, status.Error(codes.Aborted, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
+
 	}
 
 	return &clubv1.ChangeRolesPositionResponse{Roles: domain.MapToRoleObjectArr(roles)}, nil
@@ -345,15 +351,32 @@ func (s serverApi) RemoveRoleMembers(ctx context.Context, req *clubv1.RemoveRole
 
 	isAuthorized, err := s.permission.CanEditRoleAndMembersAndDeleteRole(ctx, req.GetClubId(), req.GetUserId(), req.GetRoleId())
 	if err != nil {
-		if errors.Is(err, domain.ErrUserNotClubMember) {
+		switch {
+		case errors.Is(err, domain.ErrClubOrRoleNotExists):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
 			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
+		case errors.Is(err, domain.ErrMemberNotHavePermissions), errors.Is(err, domain.ErrMemberNotHavePermissionsToEditRole):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 	if !isAuthorized {
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
 	}
 
-	// TODO: implement this shit
-	panic("implement me")
+	err = s.membership.RemoveRoleMembers(ctx, req.GetClubId(), req.GetRoleId(), req.GetUsersId())
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrCannotEditRoleMember):
+			return nil, status.Error(codes.Aborted, err.Error())
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return &empty.Empty{}, nil
 }
