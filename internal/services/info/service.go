@@ -99,7 +99,7 @@ func (s Service) GetUserRoles(ctx context.Context, clubID, userID int64) (roles 
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			return nil, false, fmt.Errorf("%s: %w", op, ErrUserNotClubMember)
+			return nil, false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
 		default:
 			log.Error("failed to get user roles", logger.Err(err))
 			return nil, false, fmt.Errorf("%s: %w", op, err)

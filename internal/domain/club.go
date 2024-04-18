@@ -32,7 +32,6 @@ type Club struct {
 func (c Club) ToClubObject() *clubv1.ClubObject {
 	roles := make([]*clubv1.Role, len(c.Roles))
 	for i, role := range c.Roles {
-		role.Permissions.HexToStringArr()
 		roles[i] = role.ToRoleProto()
 	}
 

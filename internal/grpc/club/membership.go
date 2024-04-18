@@ -147,13 +147,7 @@ func (s serverApi) UpdateRole(ctx context.Context, req *clubv1.UpdateRoleRequest
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.RoleId, validation.Required, validation.Min(1)),
-		validation.Field(&req.Permissions, validation.Each(validation.In(
-			"Administrator",
-			"ManageClub",
-			"ManageMembership",
-			"KickMember",
-			"BanMember",
-			"ManageRoles"))),
+		validation.Field(&req.Permissions, validation.By(domain.ValidatePermission)),
 		validation.Field(&req.Color, validation.Min(0)),
 	)
 	if err != nil {
@@ -194,12 +188,7 @@ func (s serverApi) UpdateRole(ctx context.Context, req *clubv1.UpdateRoleRequest
 		case "name":
 			role.Name = req.GetName()
 		case "permissions":
-			hexPermissions, err := domain.StringArrToHex(req.GetPermissions())
-			if err != nil {
-				return nil, status.Error(codes.Internal, ErrInternal.Error())
-			}
-			role.Permissions.PermissionsArr = req.GetPermissions()
-			role.Permissions.PermissionsHex = hexPermissions
+			role.Permissions = req.GetPermissions()
 		case "color":
 			role.Color = req.GetColor()
 		}

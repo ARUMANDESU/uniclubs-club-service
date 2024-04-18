@@ -89,10 +89,7 @@ func StringArrToHex(p []string) (uint64, error) {
 
 func AccumulatePermissions(roles []*Role) (accumulatedPermissions uint64) {
 	for _, role := range roles {
-		if role.Permissions.PermissionsHex&Administrator == Administrator {
-			return ALL
-		}
-		accumulatedPermissions |= role.Permissions.PermissionsHex
+		accumulatedPermissions |= role.Permissions
 	}
 	return accumulatedPermissions
 }
@@ -103,4 +100,18 @@ func HasPermission(userPermissions uint64, permission uint64) bool {
 
 func MissingPermissions(permsFrom uint64, permissions uint64) uint64 {
 	return permissions &^ permsFrom
+}
+
+func isValidPermission(permission uint64) bool {
+	return permission <= ALL
+}
+
+func ValidatePermission(value interface{}) error {
+	if permission, ok := value.(uint64); ok {
+		if !isValidPermission(permission) {
+			return fmt.Errorf("invalid permission")
+		}
+		return nil
+	}
+	return fmt.Errorf("invalid type")
 }

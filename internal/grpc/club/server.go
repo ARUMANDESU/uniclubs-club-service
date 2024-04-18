@@ -31,7 +31,7 @@ type PermissionService interface {
 	CanHandleMembershipRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	CanManageClub(ctx context.Context, clubID, userID int64) (bool, error)
 	CanManageRoles(ctx context.Context, clubID, userID int64) (bool, error)
-	CanUpdateRole(ctx context.Context, clubID, userID, roleID int64, permissions []string) (bool, error)
+	CanUpdateRole(ctx context.Context, clubID, userID, roleID int64, permissions uint64) (bool, error)
 	CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID, userID, roleID int64) (bool, error)
 	CanChangeRolesPositions(ctx context.Context, clubID, userID int64, roles []*dtos.ChangeRolesPositionDTO) (bool, error)
 }

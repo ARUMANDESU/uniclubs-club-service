@@ -196,7 +196,13 @@ func (s serverApi) GetUserRoles(ctx context.Context, req *clubv1.GetUserRolesReq
 
 	roles, isOwner, err := s.info.GetUserRoles(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
+		switch {
+		case errors.Is(err, domain.ErrUserNotClubMember):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+
 	}
 
 	return &clubv1.GetUserRolesResponse{Roles: domain.MapToRoleObjectArr(roles), IsOwner: isOwner}, nil

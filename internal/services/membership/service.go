@@ -144,8 +144,6 @@ func (s Service) GetRole(ctx context.Context, clubID, roleID int64) (*domain.Rol
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	_ = role.Permissions.HexToStringArr()
-
 	return role, nil
 }
 
@@ -153,14 +151,7 @@ func (s Service) UpdateRole(ctx context.Context, role *domain.Role) error {
 	const op = "services.membership.UpdateRole"
 	log := s.log.With(slog.String("op", op))
 
-	hexPerms, err := domain.StringArrToHex(role.Permissions.PermissionsArr)
-	if err != nil {
-		log.Error("failed to map array of permissions into hexadecimal", logger.Err(err))
-		return fmt.Errorf("%s: %w", op, err)
-	}
-	role.Permissions.PermissionsHex = hexPerms
-
-	err = s.storage.UpdateRole(ctx, role)
+	err := s.storage.UpdateRole(ctx, role)
 	if err != nil {
 		if errors.Is(err, storage.ErrEditConflict) {
 			return fmt.Errorf("%s: %w", op, ErrEditConflict)

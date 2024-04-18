@@ -122,7 +122,7 @@ func (s *Service) CanManageRoles(ctx context.Context, clubID, userID int64) (boo
 	return s.HavePermissionTo(ctx, clubID, userID, domain.ManageRoles)
 }
 
-func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int64, permissions []string) (bool, error) {
+func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int64, permissions uint64) (bool, error) {
 	const op = "service.accessControl.CanUpdateRole"
 	log := s.log.With(slog.String("op", op))
 
@@ -165,17 +165,11 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 		return false, fmt.Errorf("%w: %d", domain.ErrMemberNotHavePermissionsToEditRole, role.ID)
 	}
 
-	if permissions != nil {
-		permissionsHex, err := domain.StringArrToHex(permissions)
-		if err != nil {
-			log.Error("failed to convert permissions into hexadecimal format", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, err)
-		}
-
+	if permissions != 0 {
 		// if user does not have permissions that update perms have but roles perms have missing perms then pass else return ErrMemberNotHavePermissions
-		userMissingPerms := domain.MissingPermissions(userPermissions, permissionsHex)
+		userMissingPerms := domain.MissingPermissions(userPermissions, permissions)
 		if userMissingPerms != 0 {
-			userMissingRoleMissing := domain.MissingPermissions(role.Permissions.PermissionsHex, userMissingPerms)
+			userMissingRoleMissing := domain.MissingPermissions(role.Permissions, userMissingPerms)
 			if userMissingRoleMissing != 0 {
 				return false, fmt.Errorf("%w: %v", domain.ErrMemberNotHavePermissions, domain.PermissionsHexToStringArr(userMissingRoleMissing))
 			}
@@ -183,9 +177,9 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 		}
 
 		// update perms must have perms that role have if user does not
-		userRoleMissingPerms := domain.MissingPermissions(userPermissions, role.Permissions.PermissionsHex)
+		userRoleMissingPerms := domain.MissingPermissions(userPermissions, role.Permissions)
 		if userRoleMissingPerms != 0 {
-			updateMissingPerms := domain.MissingPermissions(permissionsHex, userRoleMissingPerms)
+			updateMissingPerms := domain.MissingPermissions(permissions, userRoleMissingPerms)
 			if updateMissingPerms != 0 {
 				return false, fmt.Errorf("%w: %v", domain.ErrMemberNotHaveAccessToRemovePermissions, domain.PermissionsHexToStringArr(updateMissingPerms))
 			}

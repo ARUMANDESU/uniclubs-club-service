@@ -10,19 +10,17 @@ type Role struct {
 	ID          int64
 	ClubID      int64
 	Name        string
-	Permissions Permissions
+	Permissions uint64
 	Position    int32
 	Color       int32
 	UpdatedAt   time.Time
 }
 
 func (r *Role) ToRoleProto() *clubv1.Role {
-	_ = r.Permissions.HexToStringArr()
-
 	return &clubv1.Role{
 		Id:          r.ID,
 		Name:        r.Name,
-		Permissions: r.Permissions.PermissionsArr,
+		Permissions: r.Permissions,
 		Position:    r.Position,
 		Color:       r.Color,
 	}

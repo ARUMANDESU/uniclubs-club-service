@@ -3,6 +3,7 @@ package postgresql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
@@ -33,16 +34,21 @@ func (s *Storage) GetUserRoles(ctx context.Context, clubID, userID int64) (roles
 	const op = "storage.postgresql.GetUserRoles"
 
 	query := `
-		SELECT c.owner_id = cu.user_id as is_owner, r.id, r.name, r.permissions, r.position, r.color
+		SELECT c.owner_id = cu.user_id AS is_owner, r.id,
+		       r.name, r.permissions, r.position, r.color
 		FROM clubs_users cu
-		LEFT JOIN clubs c ON c.id = cu.club_id
-		JOIN users_roles ur ON ur.user_id = cu.user_id
-		JOIN roles r ON r.id = ur.role_id
-		WHERE cu.club_id = $1 and cu.user_id = $2
+		JOIN clubs c ON cu.club_id = c.id  
+		JOIN users_roles ur ON cu.user_id= ur.user_id 
+		JOIN roles r ON ur.role_id = r.id 
+		WHERE c.id = $1 AND cu.user_id = $2 AND r.club_id = $1;
+
 	`
 
 	rows, err := s.DB.QueryContext(ctx, query, clubID, userID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, false, storage.ErrUserNotClubMember
+		}
 		return nil, false, fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -50,7 +56,7 @@ func (s *Storage) GetUserRoles(ctx context.Context, clubID, userID int64) (roles
 
 	for rows.Next() {
 		var role domain.Role
-		err = rows.Scan(&isOwner, &role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color)
+		err = rows.Scan(&isOwner, &role.ID, &role.Name, &role.Permissions, &role.Position, &role.Color)
 		if err != nil {
 			return nil, false, fmt.Errorf("%s: %w", op, err)
 		}
@@ -87,7 +93,7 @@ func (s *Storage) GetClubRoles(ctx context.Context, clubID int64) ([]*domain.Rol
 	for rows.Next() {
 		var role domain.Role
 
-		err := rows.Scan(&role.ID, &role.Name, &role.Position, &role.Permissions.PermissionsHex, &role.Color)
+		err := rows.Scan(&role.ID, &role.Name, &role.Position, &role.Permissions, &role.Color)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}

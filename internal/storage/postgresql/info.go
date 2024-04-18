@@ -55,7 +55,7 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, 
 	var roles []domain.Role
 	for rolesRows.Next() {
 		var r domain.Role
-		err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions.PermissionsHex, &r.Position, &r.Color)
+		err = rolesRows.Scan(&r.ID, &r.Name, &r.Permissions, &r.Position, &r.Color)
 		if err != nil {
 			return nil, fmt.Errorf("%s: scanning roles: %w", op, err)
 		}

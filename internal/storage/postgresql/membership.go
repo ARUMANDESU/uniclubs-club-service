@@ -181,7 +181,7 @@ func (s *Storage) CreateRole(ctx context.Context, dto dtos.CreateRoleDTO) (*doma
 		dto.ClubID, dto.Name, dto.Color,
 	}
 
-	err = tx.QueryRowContext(ctx, query, args...).Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color)
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&role.ID, &role.Name, &role.Permissions, &role.Position, &role.Color)
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("%s: failed to insert role: %w", op, err)
@@ -252,7 +252,7 @@ func (s *Storage) GetRoleByID(ctx context.Context, clubID, roleID int64) (*domai
 
 	var role domain.Role
 
-	err := s.DB.QueryRowContext(ctx, query, roleID, clubID).Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color, &role.UpdatedAt)
+	err := s.DB.QueryRowContext(ctx, query, roleID, clubID).Scan(&role.ID, &role.Name, &role.Permissions, &role.Position, &role.Color, &role.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, storage.ErrClubOrRoleNotExists
@@ -277,7 +277,7 @@ func (s *Storage) UpdateRole(ctx context.Context, role *domain.Role) error {
 
 	args := []any{
 		role.ID, role.ClubID, role.Name,
-		strconv.FormatUint(role.Permissions.PermissionsHex, 10), role.Position,
+		strconv.FormatUint(role.Permissions, 10), role.Position,
 		role.Color, role.UpdatedAt,
 	}
 
@@ -361,7 +361,7 @@ func (s *Storage) GetRolesOfClubByID(ctx context.Context, clubID int64) ([]*doma
 
 	for rows.Next() {
 		var role domain.Role
-		err = rows.Scan(&role.ID, &role.Name, &role.Permissions.PermissionsHex, &role.Position, &role.Color, &role.UpdatedAt)
+		err = rows.Scan(&role.ID, &role.Name, &role.Permissions, &role.Position, &role.Color, &role.UpdatedAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, storage.ErrClubOrRoleNotExists
