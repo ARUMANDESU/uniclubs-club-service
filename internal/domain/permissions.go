@@ -39,25 +39,6 @@ var PermissionList = []string{
 	"ManageRoles",
 }
 
-type Permissions struct {
-	PermissionsHex uint64
-	PermissionsArr []string
-}
-
-func (p *Permissions) HexToStringArr() error {
-	var permissions []string
-	// Iterate over all possible permissions
-	for bit, name := range Names {
-		// Check if the permission bit is set
-		if p.PermissionsHex&bit != 0 {
-			permissions = append(permissions, name)
-		}
-	}
-
-	p.PermissionsArr = permissions
-	return nil
-}
-
 func PermissionsHexToStringArr(p uint64) []string {
 	var permissions []string
 	// Iterate over all possible permissions
