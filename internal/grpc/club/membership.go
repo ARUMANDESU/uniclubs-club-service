@@ -108,7 +108,7 @@ func (s serverApi) CreateRole(ctx context.Context, req *clubv1.CreateRoleRequest
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
-		validation.Field(&req.Name, validation.Required, validation.Length(domain.MinClubNameLen, domain.MaxClubNameLen)),
+		validation.Field(&req.Name, validation.Required, validation.Length(domain.MinRoleNameLen, domain.MaxRoleNameLen)),
 		validation.Field(&req.Color, validation.Required, validation.Min(0)),
 	)
 	if err != nil {
@@ -147,6 +147,7 @@ func (s serverApi) UpdateRole(ctx context.Context, req *clubv1.UpdateRoleRequest
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
 		validation.Field(&req.RoleId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Name, validation.Length(domain.MinRoleNameLen, domain.MaxRoleNameLen)),
 		validation.Field(&req.Permissions, validation.By(domain.ValidatePermission)),
 		validation.Field(&req.Color, validation.Min(0)),
 	)

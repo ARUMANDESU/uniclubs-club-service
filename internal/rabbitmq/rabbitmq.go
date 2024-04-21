@@ -8,6 +8,15 @@ import (
 	"log/slog"
 )
 
+const (
+	UserExchangeName             = "user-exchange"
+	UserEventsQueue              = "user-events-club-queue"
+	UserEventsRoutingKey         = "user.event.*"
+	UserUpdatedEventRoutingKey   = "user.event.updated"
+	UserActivatedEventRoutingKey = "user.event.activated"
+	UserDeletedEventRoutingKey   = "user.event.deleted"
+)
+
 type Handler func(msg amqp091.Delivery) error
 
 type Rabbitmq struct {
@@ -29,6 +38,29 @@ func New(cfg config.Rabbitmq, log *slog.Logger) (*Rabbitmq, error) {
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to open a channel: %w", op, err)
+	}
+
+	_, err = ch.QueueDeclare(
+		UserEventsQueue,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to open a channel: %w", op, err)
+	}
+
+	err = ch.QueueBind(
+		UserEventsQueue,
+		UserEventsRoutingKey,
+		UserExchangeName,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to bind exchange to club queue: %w", op, err)
 	}
 
 	return &Rabbitmq{

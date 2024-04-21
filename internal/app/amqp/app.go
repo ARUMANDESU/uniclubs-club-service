@@ -32,9 +32,9 @@ func New(log *slog.Logger, service UserService, amqp Amqp) *App {
 }
 
 func (a *App) SetupMessageConsumers() {
-	a.consumeMessages("club", "user.club.activated", a.usrService.HandleCreateUser)
-	a.consumeMessages("club", "user.club.updated", a.usrService.HandleUpdateUser)
-	a.consumeMessages("club", "user.club.deleted", a.usrService.HandleDeleteUser)
+	a.consumeMessages(rabbitmq.UserEventsQueue, rabbitmq.UserActivatedEventRoutingKey, a.usrService.HandleCreateUser)
+	a.consumeMessages(rabbitmq.UserEventsQueue, rabbitmq.UserUpdatedEventRoutingKey, a.usrService.HandleUpdateUser)
+	a.consumeMessages(rabbitmq.UserEventsQueue, rabbitmq.UserDeletedEventRoutingKey, a.usrService.HandleDeleteUser)
 }
 
 func (a *App) consumeMessages(queue, routingKey string, handler rabbitmq.Handler) {

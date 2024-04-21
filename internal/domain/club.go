@@ -9,6 +9,8 @@ import (
 const (
 	MaxClubNameLen        = 75
 	MinClubNameLen        = 4
+	MaxRoleNameLen        = 30
+	MinRoleNameLen        = 3
 	MaxClubDescriptionLen = 2500
 	MinClubDescriptionLen = 4
 	MaxClubTypeLen        = 75
