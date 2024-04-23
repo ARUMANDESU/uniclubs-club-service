@@ -9,6 +9,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
+	"sync"
 )
 
 type Service struct {
@@ -33,36 +34,47 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 	const op = "service.accessControl.CheckPermission"
 	log := s.log.With(slog.String("op", op))
 
-	userRoles, isUserOwner, err := s.storage.GetUserRoles(ctx, clubID, userID)
-	if err != nil {
-		switch {
-		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
-		default:
-			log.Error("failed to get user permissions", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, err)
-		}
+	var userRoles []*domain.Role
+	var targetRoles []*domain.Role
+	var isUserOwner, isTargetOwner bool
+	var userErr, targetErr error
 
+	// Use goroutines to retrieve user roles and target roles concurrently
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		userRoles, isUserOwner, userErr = s.storage.GetUserRoles(ctx, clubID, userID)
+	}()
+	go func() {
+		defer wg.Done()
+		targetRoles, isTargetOwner, targetErr = s.storage.GetUserRoles(ctx, clubID, targetID)
+	}()
+	wg.Wait()
+
+	if userErr != nil {
+		switch {
+		case errors.Is(userErr, storage.ErrUserNotClubMember):
+			return false, domain.ErrUserNotClubMember
+		default:
+			log.Error("failed to get user permissions", logger.Err(userErr))
+			return false, fmt.Errorf("%s: %w", op, userErr)
+		}
+	}
+	if targetErr != nil {
+		switch {
+		case errors.Is(targetErr, storage.ErrUserNotClubMember):
+			return false, domain.ErrTargetNotClubMember
+		default:
+			log.Error("failed to get target permissions", logger.Err(targetErr))
+			return false, fmt.Errorf("%s: %w", op, targetErr)
+		}
 	}
 	if isUserOwner {
-		return true, nil
-	}
-
-	targetRoles, isTargetOwner, err := s.storage.GetUserRoles(ctx, clubID, targetID)
-	if err != nil {
-		switch {
-		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, domain.ErrTargetNotClubMember)
-		default:
-			log.Error("failed to get user permissions", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, err)
-		}
-
+		return !isTargetOwner, nil
 	}
 	if isTargetOwner {
-		return false, nil
+		return !isUserOwner, nil
 	}
 
 	userHighestPos, err := domain.GetHighestRolePosition(userRoles)
@@ -78,7 +90,7 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 
 	if userHighestPos < targetHighestPos {
 		log.Error(domain.ErrInsufficientRolePosition.Error())
-		return false, fmt.Errorf("%s: %w", op, domain.ErrInsufficientRolePosition)
+		return false, domain.ErrInsufficientRolePosition
 	}
 
 	userPermissions := domain.AccumulatePermissions(userRoles)
@@ -94,8 +106,7 @@ func (s *Service) HavePermissionTo(ctx context.Context, clubID, userID int64, pe
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+			return false, domain.ErrUserNotClubMember
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -139,8 +150,7 @@ func (s *Service) CanUpdateRole(ctx context.Context, clubID, userID, roleID int6
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+			return false, domain.ErrUserNotClubMember
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -208,7 +218,7 @@ func (s *Service) CanEditRoleAndMembersAndDeleteRole(ctx context.Context, clubID
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+			return false, domain.ErrUserNotClubMember
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)
@@ -250,8 +260,7 @@ func (s *Service) CanChangeRolesPositions(ctx context.Context, clubID, userID in
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrUserNotClubMember):
-			log.Error("user is not club member", logger.Err(err))
-			return false, fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+			return false, domain.ErrUserNotClubMember
 		default:
 			log.Error("failed to get user permissions", logger.Err(err))
 			return false, fmt.Errorf("%s: %w", op, err)

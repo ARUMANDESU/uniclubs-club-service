@@ -98,14 +98,11 @@ func (s serverApi) LeaveClub(ctx context.Context, req *clubv1.LeaveClubRequest) 
 		switch {
 		case errors.Is(err, domain.ErrOwnerCannotLeaveClub):
 			return nil, status.Error(codes.Aborted, err.Error())
-		case errors.Is(err, domain.ErrUserNotClubMember):
-			return nil, status.Error(codes.NotFound, err.Error())
-		case errors.Is(err, domain.ErrMemberNotFound):
+		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrMemberNotFound):
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-
 	}
 
 	return nil, nil
@@ -349,10 +346,8 @@ func (s serverApi) RemoveRoleMembers(ctx context.Context, req *clubv1.RemoveRole
 	isAuthorized, err := s.permission.CanEditRoleAndMembersAndDeleteRole(ctx, req.GetClubId(), req.GetUserId(), req.GetRoleId())
 	if err != nil {
 		switch {
-		case errors.Is(err, domain.ErrClubOrRoleNotExists):
+		case errors.Is(err, domain.ErrClubOrRoleNotExists), errors.Is(err, domain.ErrUserNotClubMember):
 			return nil, status.Error(codes.NotFound, err.Error())
-		case errors.Is(err, domain.ErrUserNotClubMember):
-			return nil, status.Error(codes.PermissionDenied, ErrUserNotClubMember.Error())
 		case errors.Is(err, domain.ErrMemberNotHavePermissions), errors.Is(err, domain.ErrMemberNotHavePermissionsToEditRole):
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		default:
@@ -376,4 +371,44 @@ func (s serverApi) RemoveRoleMembers(ctx context.Context, req *clubv1.RemoveRole
 	}
 
 	return &empty.Empty{}, nil
+}
+
+func (s serverApi) KickMemberFromClub(ctx context.Context, req *clubv1.KickMemberFromClubRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.TargetId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanActOnMember(ctx, req.GetClubId(), req.GetUserId(), req.GetTargetId(), domain.KickMember)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrTargetNotClubMember):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrInsufficientRolePosition):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	err = s.membership.RemoveMemberFromClub(ctx, req.GetClubId(), req.GetTargetId())
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrOwnerCannotLeaveClub):
+			return nil, status.Error(codes.Aborted, domain.ErrOwnerCannotBeKickedOut.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrMemberNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return nil, nil
 }
