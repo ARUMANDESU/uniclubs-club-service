@@ -36,6 +36,7 @@ type Storage interface {
 	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
 	HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	RemoveRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
+	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -217,7 +218,22 @@ func (s Service) RemoveMemberFromClub(ctx context.Context, clubID, userID int64)
 	const op = "services.membership.RemoveMemberFromClub"
 	log := s.log.With(slog.String("op", op))
 
-	err := s.storage.RemoveMemberFromClub(ctx, clubID, userID)
+	_, isOwner, err := s.storage.GetUserRoles(ctx, clubID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+		default:
+			log.Error("failed to get user roles", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	if isOwner {
+		return domain.ErrOwnerCannotLeaveClub
+	}
+
+	err = s.storage.RemoveMemberFromClub(ctx, clubID, userID)
 	if err != nil {
 		if errors.Is(err, domain.ErrMemberNotFound) {
 			log.Debug("err member not found", logger.Err(err))

@@ -23,4 +23,5 @@ var (
 	ErrTargetNotClubMember                    = errors.New("target user is not club member")
 	ErrMemberNotHaveAccessToRemovePermissions = errors.New("member does not have permissions to remove role permissions that member does not have")
 	ErrCannotEditRoleMember                   = errors.New("no one can edit role 'member'")
+	ErrOwnerCannotLeaveClub                   = errors.New("owner cannot leave the club, first pass on the ownership to other member")
 )

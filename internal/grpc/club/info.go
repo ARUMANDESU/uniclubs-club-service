@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
-	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/info"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
 	"google.golang.org/grpc/codes"
@@ -47,7 +47,7 @@ func (s serverApi) GetClub(ctx context.Context, req *clubv1.GetClubRequest) (*cl
 
 	club, err := s.info.GetClub(ctx, req.GetClubId())
 	if err != nil {
-		if errors.Is(err, management.ErrClubNotExists) {
+		if errors.Is(err, info.ErrClubNotExists) {
 			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
 		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())

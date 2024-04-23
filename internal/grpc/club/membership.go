@@ -95,10 +95,17 @@ func (s serverApi) LeaveClub(ctx context.Context, req *clubv1.LeaveClubRequest) 
 
 	err = s.membership.RemoveMemberFromClub(ctx, req.GetClubId(), req.GetUserId())
 	if err != nil {
-		if errors.Is(err, domain.ErrMemberNotFound) {
-			return nil, status.Error(codes.NotFound, domain.ErrMemberNotFound.Error())
+		switch {
+		case errors.Is(err, domain.ErrOwnerCannotLeaveClub):
+			return nil, status.Error(codes.Aborted, err.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrMemberNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
+
 	}
 
 	return nil, nil
