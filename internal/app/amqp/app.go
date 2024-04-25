@@ -15,6 +15,7 @@ type App struct {
 
 type Amqp interface {
 	Consume(queue string, routingKey string, handler func(msg amqp091.Delivery) error) error
+	Close() error
 }
 
 type UserService interface {
@@ -47,4 +48,10 @@ func (a *App) consumeMessages(queue, routingKey string, handler rabbitmq.Handler
 			log.Error("failed to consume ", logger.Err(err))
 		}
 	}()
+}
+
+func (a *App) Shutdown() {
+	// Add your cleanup logic here
+	// For example, close the RabbitMQ connection
+	a.amqp.Close()
 }

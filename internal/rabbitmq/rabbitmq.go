@@ -132,3 +132,22 @@ func (r *Rabbitmq) Consume(queue, routingKey string, handler func(msg amqp091.De
 
 	return nil
 }
+
+func (r *Rabbitmq) Close() error {
+	const op = "Rabbitmq.Close"
+	log := r.log.With(slog.String("op", op))
+
+	err := r.ch.Close()
+	if err != nil {
+		log.Error("failed to close channel", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	err = r.conn.Close()
+	if err != nil {
+		log.Error("failed to close connection", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}

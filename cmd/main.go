@@ -34,7 +34,10 @@ func main() {
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
 	sign := <-stop
+	defer log.Info("application stopped", slog.String("signal", sign.String()))
 	log.Info("stopping application", slog.String("signal", sign.String()))
+	application.GRPCSrv.Stop()
+	application.AMQPApp.Shutdown()
 }
 
 func setupLogger(env string) *slog.Logger {
