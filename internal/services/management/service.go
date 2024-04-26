@@ -7,10 +7,12 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/clients/image"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	imagev1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/filestorage"
 	"log/slog"
+	"time"
 )
 
 var (
@@ -21,21 +23,27 @@ var (
 
 type Service struct {
 	log         *slog.Logger
+	amqp        Amqp
 	storage     Storage
 	imageClient *image.Client
 }
 
+type Amqp interface {
+	Publish(ctx context.Context, exchangeName string, routingKey string, msg any) error
+}
+
 type Storage interface {
 	SaveClub(ctx context.Context, dto dtos.CreateClubDTO) error
-	ApproveClub(ctx context.Context, clubID int64) error
+	ApproveClub(ctx context.Context, clubID int64) (int64, error)
 	RejectClub(ctx context.Context, clubID int64) error
 	UpdateClub(ctx context.Context, club *domain.Club) error
 	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
 }
 
-func New(log *slog.Logger, storage Storage, imageClient *image.Client) *Service {
+func New(log *slog.Logger, storage Storage, imageClient *image.Client, amqp Amqp) *Service {
 	return &Service{
 		log:         log,
+		amqp:        amqp,
 		storage:     storage,
 		imageClient: imageClient,
 	}
@@ -58,11 +66,23 @@ func (s Service) ApproveClub(ctx context.Context, clubID int64) error {
 	const op = "services.management.ApproveClub"
 	log := s.log.With(slog.String("op", op))
 
-	err := s.storage.ApproveClub(ctx, clubID)
+	userID, err := s.storage.ApproveClub(ctx, clubID)
 	if err != nil {
 		log.Error("failed to approve club", logger.Err(err))
 		return fmt.Errorf("%s: %w", op, err)
 	}
+
+	s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, domain.Notification{
+		UserID:      userID,
+		Message:     "Your club has been approved",
+		Description: "Your club has been approved and is now visible to other users",
+		Status:      "NEW",
+		Severity:    "INFO",
+		Source:      "club",
+		DisplayType: "INBOX",
+		CreatedAt:   time.Now().String(),
+		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+	})
 
 	return nil
 }

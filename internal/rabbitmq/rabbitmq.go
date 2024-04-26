@@ -1,27 +1,31 @@
 package rabbitmq
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/config"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
-	"github.com/rabbitmq/amqp091-go"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"log/slog"
 )
 
 const (
+	ClubExchangeName             = "club-exchange"
 	UserExchangeName             = "user-exchange"
 	UserEventsQueue              = "user-events-club-queue"
+	PushNotificationRoutingKey   = "user.notification.push"
 	UserEventsRoutingKey         = "user.event.*"
 	UserUpdatedEventRoutingKey   = "user.event.updated"
 	UserActivatedEventRoutingKey = "user.event.activated"
 	UserDeletedEventRoutingKey   = "user.event.deleted"
 )
 
-type Handler func(msg amqp091.Delivery) error
+type Handler func(msg amqp.Delivery) error
 
 type Rabbitmq struct {
-	conn *amqp091.Connection
-	ch   *amqp091.Channel
+	conn *amqp.Connection
+	ch   *amqp.Channel
 	cfg  config.Rabbitmq
 	log  *slog.Logger
 }
@@ -30,7 +34,7 @@ func New(cfg config.Rabbitmq, log *slog.Logger) (*Rabbitmq, error) {
 	const op = "Rabbitmq.New"
 
 	connString := fmt.Sprintf("amqp://%v:%v@%v:%v/", cfg.User, cfg.Password, cfg.Host, cfg.Port)
-	conn, err := amqp091.Dial(connString)
+	conn, err := amqp.Dial(connString)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to connect to amqp server: %w", op, err)
 	}
@@ -38,6 +42,20 @@ func New(cfg config.Rabbitmq, log *slog.Logger) (*Rabbitmq, error) {
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to open a channel: %w", op, err)
+	}
+
+	err = ch.ExchangeDeclare(
+		ClubExchangeName,
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Error("failed to declare exchange", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	_, err = ch.QueueDeclare(
@@ -49,7 +67,8 @@ func New(cfg config.Rabbitmq, log *slog.Logger) (*Rabbitmq, error) {
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to open a channel: %w", op, err)
+		log.Error("failed to declare queue", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	err = ch.QueueBind(
@@ -60,7 +79,8 @@ func New(cfg config.Rabbitmq, log *slog.Logger) (*Rabbitmq, error) {
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to bind exchange to club queue: %w", op, err)
+		log.Error("failed to bind queue", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return &Rabbitmq{
@@ -71,7 +91,7 @@ func New(cfg config.Rabbitmq, log *slog.Logger) (*Rabbitmq, error) {
 	}, nil
 }
 
-func (r *Rabbitmq) Consume(queue, routingKey string, handler func(msg amqp091.Delivery) error) error {
+func (r *Rabbitmq) Consume(queue, routingKey string, handler func(msg amqp.Delivery) error) error {
 	const op = "Rabbitmq.Consume"
 	log := r.log.With(
 		slog.String("op", op),
@@ -129,6 +149,32 @@ func (r *Rabbitmq) Consume(queue, routingKey string, handler func(msg amqp091.De
 	}()
 
 	<-forever
+
+	return nil
+}
+
+func (r *Rabbitmq) Publish(ctx context.Context, exchangeName string, routingKey string, msg any) error {
+	const op = "Rabbitmq.Publish"
+
+	bytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	err = r.ch.PublishWithContext(
+		ctx,
+		exchangeName,
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         bytes,
+		})
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
 
 	return nil
 }

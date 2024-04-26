@@ -43,7 +43,7 @@ func New(log *slog.Logger, cfg *config.Config) *App {
 	}
 
 	usrService := user.New(log, storage)
-	managementService := management.New(log, storage, imageClient)
+	managementService := management.New(log, storage, imageClient, rmq)
 	membershipService := membership.New(log, storage)
 	infoService := info.New(log, storage)
 	permissionService := accessControl.New(log, storage)

@@ -56,12 +56,12 @@ func (s *Storage) SaveClub(ctx context.Context, dto dtos.CreateClubDTO) error {
 	return nil
 }
 
-func (s *Storage) ApproveClub(ctx context.Context, clubID int64) error {
+func (s *Storage) ApproveClub(ctx context.Context, clubID int64) (int64, error) {
 	const op = "storage.postgresql.ApproveClub"
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to begin transaction: %w", op, err)
 	}
 
 	// Defer the rollback in case of any error.
@@ -80,52 +80,52 @@ func (s *Storage) ApproveClub(ctx context.Context, clubID int64) error {
 	err = tx.QueryRowContext(ctx, `DELETE FROM create_club_requests WHERE club_id = $1 RETURNING user_id`, clubID).Scan(&userID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to delete create club request and get userID: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to delete create club request and get userID: %w", op, err)
 	}
 
 	// Update club approved to true
-	result, err := tx.ExecContext(ctx, `UPDATE clubs SET approved = true WHERE id = $1 and not approved`, clubID)
+	result, err := tx.ExecContext(ctx, `UPDATE clubs SET approved = true WHERE id = $1 AND not approved`, clubID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to update club approved to true: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to update club approved to true: %w", op, err)
 	}
 	// Check the number of rows affected
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to get rows affected from update: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to get rows affected from update: %w", op, err)
 	}
 
 	if rowsAffected == 0 {
 		tx.Rollback()
-		return fmt.Errorf("%s: no rows updated, club may already be approved or does not exist", op)
+		return 0, fmt.Errorf("%s: no rows updated, club may already be approved or does not exist", op)
 	}
 
 	// New president role
 	err = tx.QueryRowContext(ctx, `INSERT INTO roles(club_id, name, permissions, position, color) VALUES ($1, $2, '0', 0, 8223868) returning id`, clubID, "member").Scan(&roleID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to insert member role: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to insert member role: %w", op, err)
 	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO clubs_users(user_id, club_id) VALUES ($1, $2)`, userID, clubID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to insert to clubs_users: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to insert to clubs_users: %w", op, err)
 	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO users_roles(user_id, role_id) VALUES ($1, $2)`, userID, roleID)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("%s: failed to insert to users_roles: %w", op, err)
+		return 0, fmt.Errorf("%s: failed to insert to users_roles: %w", op, err)
 	}
 
 	// Commit the transaction.
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+		return 0, fmt.Errorf("%s: transaction commit failed: %w", op, err)
 	}
 
-	return nil
+	return userID, nil
 }
 
 func (s *Storage) RejectClub(ctx context.Context, clubID int64) error {
