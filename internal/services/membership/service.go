@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/info"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
+	"time"
 )
 
 var (
@@ -18,10 +21,16 @@ var (
 
 type Service struct {
 	log     *slog.Logger
+	amqp    Amqp
 	storage Storage
 }
 
+type Amqp interface {
+	Publish(ctx context.Context, exchangeName string, routingKey string, msg any) error
+}
+
 type Storage interface {
+	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
 	InsertJoinRequest(ctx context.Context, userID, clubID int64) error
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	AddNewMember(ctx context.Context, clubID, userID int64) error
@@ -42,10 +51,11 @@ type Storage interface {
 	GetBanRecord(ctx context.Context, clubID, userID int64) (*domain.BanRecord, error)
 }
 
-func New(log *slog.Logger, storage Storage) *Service {
+func New(log *slog.Logger, storage Storage, amqp Amqp) *Service {
 	return &Service{
 		log:     log,
 		storage: storage,
+		amqp:    amqp,
 	}
 }
 
@@ -318,6 +328,33 @@ func (s Service) BanMember(ctx context.Context, dto dtos.BanMemberDTO) error {
 		}
 	}
 
+	club, err := s.storage.GetClubByID(ctx, dto.ClubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			return fmt.Errorf("%s: %w", op, info.ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	notification := domain.Notification{
+		UserID:      dto.UserID,
+		Message:     fmt.Sprintf("You have been banned from the club %s", club.Name),
+		Description: fmt.Sprintf("You have been banned from the club %s, because %s", club.Name, dto.Reason),
+		Status:      "NEW",
+		Severity:    "HIGH",
+		Source:      "club",
+		DisplayType: "INBOX",
+		CreatedAt:   time.Now().String(),
+		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+	}
+
+	err = s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notification)
+	if err != nil {
+		log.Error("failed to publish notification", logger.Err(err))
+		return err
+	}
+
 	return nil
 }
 
@@ -350,6 +387,33 @@ func (s Service) UnbanUser(ctx context.Context, dto dtos.UnbanUserDTO) error {
 			log.Error("failed to unban user", logger.Err(err))
 			return err
 		}
+	}
+
+	club, err := s.storage.GetClubByID(ctx, dto.ClubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			return fmt.Errorf("%s: %w", op, info.ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	notification := domain.Notification{
+		UserID:      dto.UserID,
+		Message:     fmt.Sprintf("You have been unbanned from the club %s", club.Name),
+		Description: fmt.Sprintf("You have been unbanned from the club %s", club.Name),
+		Status:      "NEW",
+		Severity:    "HIGH",
+		Source:      "club",
+		DisplayType: "INBOX",
+		CreatedAt:   time.Now().String(),
+		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+	}
+
+	err = s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notification)
+	if err != nil {
+		log.Error("failed to publish notification", logger.Err(err))
+		return err
 	}
 
 	return nil
