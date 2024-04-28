@@ -51,6 +51,11 @@ type Storage interface {
 		*domain.Metadata,
 		error,
 	)
+	ListBannedUsers(ctx context.Context, clubID int64, query string, filters domain.Filters) (
+		[]*domain.BanRecord,
+		*domain.Metadata,
+		error,
+	)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -208,4 +213,17 @@ func (s Service) GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) 
 	}
 
 	return clubv1.JoinStatus_NOT_MEMBER, nil
+}
+
+func (s Service) ListBannedUsers(ctx context.Context, clubID int64, query string, filters domain.Filters) ([]*domain.BanRecord, *domain.Metadata, error) {
+	const op = "services.info.ListBannedUsers"
+	log := s.log.With(slog.String("op", op))
+
+	bannedUsers, metadata, err := s.storage.ListBannedUsers(ctx, clubID, query, filters)
+	if err != nil {
+		log.Error("failed to get banned users", logger.Err(err))
+		return nil, nil, err
+	}
+
+	return bannedUsers, metadata, nil
 }

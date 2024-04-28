@@ -479,7 +479,7 @@ func (s serverApi) UnbanUserFromClub(ctx context.Context, req *clubv1.UnbanUserF
 	}
 
 	log.Println(banRecord)
-	isAuthorized, err := s.permission.CanRevertAdminAction(ctx, req.GetClubId(), req.GetUserId(), banRecord.AdminID, domain.BanMember)
+	isAuthorized, err := s.permission.CanRevertAdminAction(ctx, req.GetClubId(), req.GetUserId(), banRecord.Admin.ID, domain.BanMember)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrTargetNotClubMember):

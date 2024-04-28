@@ -456,3 +456,53 @@ func (s *Storage) HaveUserJoinRequest(ctx context.Context, clubID, userID int64)
 
 	return joinID != 0, nil
 }
+
+func (s *Storage) ListBannedUsers(ctx context.Context, clubID int64, query string, filters domain.Filters) (
+	[]*domain.BanRecord,
+	*domain.Metadata,
+	error,
+) {
+	const op = "storage.postgresql.ListBannedUsers"
+	q := `
+		SELECT count(*) OVER(), b.id, b.club_id, u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url, b.reason, b.banned_at,
+			   a.id AS admin_id, a.email AS admin_email, a.barcode AS admin_barcode, a.first_name AS admin_first_name, a.last_name AS admin_last_name, a.avatar_url AS admin_avatar_url
+		FROM bans b
+		JOIN users u ON b.user_id = u.id
+		JOIN users a ON b.admin_id = a.id
+		WHERE b.club_id = $2 AND 
+			  ( (STRPOS(LOWER(u.email), LOWER($1)) > 0 OR $1 = '') OR
+			(STRPOS(LOWER(u.first_name), LOWER($1)) > 0 OR $1 = '') OR
+			(STRPOS(LOWER(u.last_name), LOWER($1)) > 0 OR $1 = '') )
+		LIMIT $3 OFFSET $4;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	rows, err := s.DB.QueryContext(ctx, q, query, clubID, filters.Limit(), filters.Offset())
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	var totalRecords int32
+	var bans []*domain.BanRecord
+	for rows.Next() {
+		var ban domain.BanRecord
+		err := rows.Scan(&totalRecords, &ban.ID, &ban.ClubID,
+			&ban.User.ID, &ban.User.Email, &ban.User.Barcode, &ban.User.FirstName, &ban.User.LastName, &ban.User.AvatarURL,
+			&ban.Reason, &ban.BannedAt,
+			&ban.Admin.ID, &ban.Admin.Email, &ban.Admin.Barcode, &ban.Admin.FirstName, &ban.Admin.LastName, &ban.Admin.AvatarURL)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", op, err)
+		}
+		bans = append(bans, &ban)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	metadata := domain.CalculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return bans, &metadata, nil
+}

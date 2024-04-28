@@ -37,6 +37,7 @@ type InfoService interface {
 	)
 	ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
 	ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
+	ListBannedUsers(ctx context.Context, clubID int64, query string, filters domain.Filters) ([]*domain.BanRecord, *domain.Metadata, error)
 }
 
 func (s serverApi) GetClub(ctx context.Context, req *clubv1.GetClubRequest) (*clubv1.ClubObject, error) {
@@ -247,7 +248,30 @@ func (s serverApi) GetJoinStatus(ctx context.Context, req *clubv1.GetJoinStatusR
 	return &clubv1.GetJoinStatusResponse{Status: joinStatus}, nil
 }
 
-func (s serverApi) ListBannedUsers(ctx context.Context, request *clubv1.ListBannedUsersRequest) (*clubv1.ListBannedUsersResponse, error) {
-	//TODO implement me
-	panic("implement me")
+func (s serverApi) ListBannedUsers(ctx context.Context, req *clubv1.ListBannedUsersRequest) (*clubv1.ListBannedUsersResponse, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.PageNumber, validation.Required, validation.Min(1)),
+		validation.Field(&req.PageSize, validation.Required, validation.Min(1)),
+		validation.Field(&req.Query, validation.Length(0, 255)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	f := domain.Filters{
+		Page:     req.GetPageNumber(),
+		PageSize: req.GetPageSize(),
+	}
+
+	banRecords, metadata, err := s.info.ListBannedUsers(ctx, req.GetClubId(), req.GetQuery(), f)
+	if err != nil {
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	return &clubv1.ListBannedUsersResponse{
+		Bans:     domain.BanRecordsToBanRecordObjects(banRecords),
+		Metadata: domain.ToPagination(metadata),
+	}, nil
 }

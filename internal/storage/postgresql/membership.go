@@ -619,7 +619,7 @@ func (s *Storage) GetBanRecord(ctx context.Context, clubID, userID int64) (*doma
 
 	var banRecord domain.BanRecord
 
-	err := s.DB.QueryRowContext(ctx, query, userID, clubID).Scan(&banRecord.ID, &banRecord.UserID, &banRecord.ClubID, &banRecord.AdminID, &banRecord.Reason, &banRecord.BannedAt)
+	err := s.DB.QueryRowContext(ctx, query, userID, clubID).Scan(&banRecord.ID, &banRecord.User.ID, &banRecord.ClubID, &banRecord.Admin.ID, &banRecord.Reason, &banRecord.BannedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, storage.ErrBanRecordNotExists
