@@ -27,6 +27,7 @@ type Storage interface {
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	GetUserClubsByID(ctx context.Context, userID int64) ([]*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
+	GetBanRecord(ctx context.Context, clubID, userID int64) (*domain.BanRecord, error)
 	HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	ListClubs(
 		ctx context.Context,
@@ -195,6 +196,15 @@ func (s Service) GetJoinStatusOfUser(ctx context.Context, clubID, userID int64) 
 	}
 	if haveUserJoinRequest {
 		return clubv1.JoinStatus_PENDING, nil
+	}
+
+	banRecord, err := s.storage.GetBanRecord(ctx, clubID, userID)
+	if err != nil && !errors.Is(err, storage.ErrBanRecordNotExists) {
+		log.Error("failed to get ban record", logger.Err(err))
+		return clubv1.JoinStatus_NOT_MEMBER, err
+	}
+	if banRecord != nil {
+		return clubv1.JoinStatus_BANNED, nil
 	}
 
 	return clubv1.JoinStatus_NOT_MEMBER, nil
