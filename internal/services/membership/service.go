@@ -37,6 +37,9 @@ type Storage interface {
 	HaveUserJoinRequest(ctx context.Context, clubID, userID int64) (bool, error)
 	RemoveRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
+	BanMember(ctx context.Context, dto dtos.BanMemberDTO) error
+	UnbanUser(ctx context.Context, dto dtos.UnbanUserDTO) error
+	GetBanRecord(ctx context.Context, clubID, userID int64) (*domain.BanRecord, error)
 }
 
 func New(log *slog.Logger, storage Storage) *Service {
@@ -261,6 +264,68 @@ func (s Service) RemoveRoleMembers(ctx context.Context, clubID, roleID int64, us
 			return fmt.Errorf("%s: %w", op, err)
 		}
 
+	}
+
+	return nil
+}
+
+func (s Service) BanMember(ctx context.Context, dto dtos.BanMemberDTO) error {
+	const op = "services.membership.BanMember"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.RemoveMemberFromClub(ctx, dto.ClubID, dto.UserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMemberNotFound) {
+			log.Debug("err member not found", logger.Err(err))
+			return err
+		}
+		log.Error("failed to remove member from club", logger.Err(err))
+		return err
+	}
+
+	err = s.storage.BanMember(ctx, dto)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserAlreadyBanned):
+			return domain.ErrUserAlreadyBanned
+		default:
+			log.Error("failed to ban member", logger.Err(err))
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s Service) GetBanRecord(ctx context.Context, clubID, userID int64) (*domain.BanRecord, error) {
+	const op = "services.membership.GetBanRecord"
+	log := s.log.With(slog.String("op", op))
+
+	banRecord, err := s.storage.GetBanRecord(ctx, clubID, userID)
+	if err != nil {
+		if errors.Is(err, storage.ErrBanRecordNotExists) {
+			return nil, domain.ErrUserNotBanned
+		}
+		log.Error("failed to get ban record", logger.Err(err))
+		return nil, err
+	}
+
+	return banRecord, nil
+}
+
+func (s Service) UnbanUser(ctx context.Context, dto dtos.UnbanUserDTO) error {
+	const op = "services.membership.UnbanUser"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.UnbanUser(ctx, dto)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserNotBanned):
+			return domain.ErrUserNotBanned
+		default:
+			log.Error("failed to unban user", logger.Err(err))
+			return err
+		}
 	}
 
 	return nil

@@ -57,7 +57,7 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 		case errors.Is(userErr, storage.ErrUserNotClubMember):
 			return false, domain.ErrUserNotClubMember
 		default:
-			log.Error("failed to get user permissions", logger.Err(userErr))
+			log.Error("failed to get user's permissions", logger.Err(userErr))
 			return false, fmt.Errorf("%s: %w", op, userErr)
 		}
 	}
@@ -66,7 +66,7 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 		case errors.Is(targetErr, storage.ErrUserNotClubMember):
 			return false, domain.ErrTargetNotClubMember
 		default:
-			log.Error("failed to get target permissions", logger.Err(targetErr))
+			log.Error("failed to get target's permissions", logger.Err(targetErr))
 			return false, fmt.Errorf("%s: %w", op, targetErr)
 		}
 	}
@@ -79,16 +79,84 @@ func (s *Service) CanActOnMember(ctx context.Context, clubID, userID, targetID i
 
 	userHighestPos, err := domain.GetHighestRolePosition(userRoles)
 	if err != nil {
-		log.Error("failed to get user highest role position", logger.Err(err))
+		log.Error("failed to get user's highest role position", logger.Err(err))
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 	targetHighestPos, err := domain.GetHighestRolePosition(targetRoles)
 	if err != nil {
-		log.Error("failed to get target highest role position", logger.Err(err))
+		log.Error("failed to get target's highest role position", logger.Err(err))
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
-	if userHighestPos < targetHighestPos {
+	if userHighestPos <= targetHighestPos {
+		log.Error(domain.ErrInsufficientRolePosition.Error())
+		return false, domain.ErrInsufficientRolePosition
+	}
+
+	userPermissions := domain.AccumulatePermissions(userRoles)
+
+	return domain.HasPermission(userPermissions, permission), nil
+}
+
+func (s *Service) CanRevertAdminAction(ctx context.Context, clubID, userID, adminID int64, permission uint64) (bool, error) {
+	const op = "service.accessControl.CanRevertAdminAction"
+	log := s.log.With(slog.String("op", op))
+
+	var userRoles []*domain.Role
+	var adminRoles []*domain.Role
+	var isUserOwner, isAdminOwner bool
+	var userErr, adminErr error
+
+	// Use goroutines to retrieve user roles and target roles concurrently
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		userRoles, isUserOwner, userErr = s.storage.GetUserRoles(ctx, clubID, userID)
+	}()
+	go func() {
+		defer wg.Done()
+		adminRoles, isAdminOwner, adminErr = s.storage.GetUserRoles(ctx, clubID, adminID)
+	}()
+	wg.Wait()
+
+	if userErr != nil {
+		switch {
+		case errors.Is(userErr, storage.ErrUserNotClubMember):
+			return false, domain.ErrUserNotClubMember
+		default:
+			log.Error("failed to get user's permissions", logger.Err(userErr))
+			return false, fmt.Errorf("%s: %w", op, userErr)
+		}
+	}
+	if adminErr != nil {
+		switch {
+		case errors.Is(adminErr, storage.ErrUserNotClubMember):
+			return false, domain.ErrUserNotClubMember
+		default:
+			log.Error("failed to get admin's permissions", logger.Err(adminErr))
+			return false, fmt.Errorf("%s: %w", op, adminErr)
+		}
+	}
+	if isUserOwner {
+		return true, nil
+	}
+	if isAdminOwner {
+		return isUserOwner, nil
+	}
+
+	userHighestPos, err := domain.GetHighestRolePosition(userRoles)
+	if err != nil {
+		log.Error("failed to get user's highest role position", logger.Err(err))
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+	adminHighestPos, err := domain.GetHighestRolePosition(adminRoles)
+	if err != nil {
+		log.Error("failed to get admin's highest role position", logger.Err(err))
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if userHighestPos < adminHighestPos {
 		log.Error(domain.ErrInsufficientRolePosition.Error())
 		return false, domain.ErrInsufficientRolePosition
 	}
@@ -294,5 +362,4 @@ func (s *Service) CanChangeRolesPositions(ctx context.Context, clubID, userID in
 	}
 
 	return true, nil
-
 }

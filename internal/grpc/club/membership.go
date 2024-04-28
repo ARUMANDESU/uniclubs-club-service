@@ -12,6 +12,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"log"
 )
 
 type MembershipService interface {
@@ -26,6 +27,9 @@ type MembershipService interface {
 	AddRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
 	RemoveMemberFromClub(ctx context.Context, clubID, userID int64) error
 	RemoveRoleMembers(ctx context.Context, clubID, roleID int64, usersID []int64) error
+	BanMember(ctx context.Context, dto dtos.BanMemberDTO) error
+	UnbanUser(ctx context.Context, dto dtos.UnbanUserDTO) error
+	GetBanRecord(ctx context.Context, clubID, userID int64) (*domain.BanRecord, error)
 }
 
 func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJoinClubRequest) (*empty.Empty, error) {
@@ -404,6 +408,94 @@ func (s serverApi) KickMemberFromClub(ctx context.Context, req *clubv1.KickMembe
 		case errors.Is(err, domain.ErrOwnerCannotLeaveClub):
 			return nil, status.Error(codes.Aborted, domain.ErrOwnerCannotBeKickedOut.Error())
 		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrMemberNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return nil, nil
+}
+
+func (s serverApi) BanMemberFromClub(ctx context.Context, req *clubv1.BanMemberFromClubRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.TargetId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Reason, validation.Length(0, 200)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanActOnMember(ctx, req.GetClubId(), req.GetUserId(), req.GetTargetId(), domain.BanMember)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrTargetNotClubMember):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrInsufficientRolePosition):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	err = s.membership.BanMember(ctx, dtos.BanMemberRequestToDTO(req))
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrMemberNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrUserAlreadyBanned):
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return nil, nil
+}
+
+func (s serverApi) UnbanUserFromClub(ctx context.Context, req *clubv1.UnbanUserFromClubRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.TargetId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	banRecord, err := s.membership.GetBanRecord(ctx, req.GetClubId(), req.GetTargetId())
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotBanned) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+
+	log.Println(banRecord)
+	isAuthorized, err := s.permission.CanRevertAdminAction(ctx, req.GetClubId(), req.GetUserId(), banRecord.AdminID, domain.BanMember)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserNotClubMember), errors.Is(err, domain.ErrTargetNotClubMember):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrInsufficientRolePosition):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	err = s.membership.UnbanUser(ctx, dtos.UnbanUserRequestToDTO(req))
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserNotBanned):
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, ErrInternal.Error())

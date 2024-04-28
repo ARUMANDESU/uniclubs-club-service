@@ -559,3 +559,74 @@ func (s *Storage) RemoveRoleMembers(ctx context.Context, clubID, roleID int64, u
 
 	return nil
 }
+
+func (s *Storage) BanMember(ctx context.Context, dto dtos.BanMemberDTO) error {
+	const op = "storage.postgresql.BanMember"
+
+	query := `INSERT INTO bans(user_id, club_id, admin_id, reason, banned_at) VALUES ($1, $2, $3, $4, current_timestamp)`
+
+	result, err := s.DB.ExecContext(ctx, query, dto.UserID, dto.ClubID, dto.AdminID, dto.Reason)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return fmt.Errorf("%d: %w", dto.UserID, domain.ErrUserAlreadyBanned)
+			}
+		}
+		return fmt.Errorf("%s: failed to ban member : %w", op, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s: failed to get rows affected from inserting into bans: %w", op, err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("%s: no rows inserted into bans", op)
+	}
+
+	return nil
+}
+
+func (s *Storage) UnbanUser(ctx context.Context, dto dtos.UnbanUserDTO) error {
+	const op = "storage.postgresql.UnbanUser"
+
+	query := `DELETE FROM bans WHERE user_id = $1 AND club_id = $2`
+
+	result, err := s.DB.ExecContext(ctx, query, dto.UserID, dto.ClubID)
+	if err != nil {
+		return fmt.Errorf("%s: failed to unban member : %w", op, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s: failed to get rows affected from deleting from bans: %w", op, err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("%s: no rows deleted from bans: %w", op, domain.ErrUserNotBanned)
+	}
+
+	return nil
+}
+
+func (s *Storage) GetBanRecord(ctx context.Context, clubID, userID int64) (*domain.BanRecord, error) {
+	const op = "storage.postgresql.GetBanRecord"
+
+	query := `
+		SELECT id, user_id, club_id, admin_id, reason, banned_at
+		FROM bans
+		WHERE user_id = $1 AND club_id = $2
+	`
+
+	var banRecord domain.BanRecord
+
+	err := s.DB.QueryRowContext(ctx, query, userID, clubID).Scan(&banRecord.ID, &banRecord.UserID, &banRecord.ClubID, &banRecord.AdminID, &banRecord.Reason, &banRecord.BannedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrBanRecordNotExists
+		}
+
+		return nil, fmt.Errorf("%s: failed to get a ban record: %w", op, err)
+	}
+
+	return &banRecord, nil
+}

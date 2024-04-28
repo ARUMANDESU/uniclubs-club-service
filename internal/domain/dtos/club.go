@@ -21,6 +21,19 @@ type ChangeRolesPositionDTO struct {
 	Position int32
 }
 
+type BanMemberDTO struct {
+	ClubID  int64
+	UserID  int64
+	AdminID int64
+	Reason  string
+}
+
+type UnbanUserDTO struct {
+	ClubID  int64
+	UserID  int64
+	AdminID int64
+}
+
 func MapToChangeRolesPositionDTOArr(roles []*clubv1.ChangeRolesPositionItems) []*ChangeRolesPositionDTO {
 	dto := make([]*ChangeRolesPositionDTO, len(roles))
 	for i, role := range roles {
@@ -39,5 +52,22 @@ func CreateClubRequestToDTO(req *clubv1.CreateClubRequest) CreateClubDTO {
 		Description: req.Description,
 		ClubType:    req.ClubType,
 		OwnerID:     req.OwnerId,
+	}
+}
+
+func BanMemberRequestToDTO(req *clubv1.BanMemberFromClubRequest) BanMemberDTO {
+	return BanMemberDTO{
+		ClubID:  req.GetClubId(),
+		UserID:  req.GetTargetId(),
+		AdminID: req.GetUserId(),
+		Reason:  req.GetReason(),
+	}
+}
+
+func UnbanUserRequestToDTO(req *clubv1.UnbanUserFromClubRequest) UnbanUserDTO {
+	return UnbanUserDTO{
+		ClubID:  req.GetClubId(),
+		UserID:  req.GetTargetId(),
+		AdminID: req.GetUserId(),
 	}
 }

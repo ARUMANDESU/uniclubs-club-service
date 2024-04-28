@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  DATABASE_DSN: postgresql://postgres:admin@localhost:5432/club_service?sslmode=disable
+  DATABASE_DSN: postgresql://postgres:password@172.17.0.1:5432/clubdb?sslmode=disable
 
 tasks:
   run:local:

@@ -246,3 +246,8 @@ func (s serverApi) GetJoinStatus(ctx context.Context, req *clubv1.GetJoinStatusR
 
 	return &clubv1.GetJoinStatusResponse{Status: joinStatus}, nil
 }
+
+func (s serverApi) ListBannedUsers(ctx context.Context, request *clubv1.ListBannedUsersRequest) (*clubv1.ListBannedUsersResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
