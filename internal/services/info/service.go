@@ -219,6 +219,20 @@ func (s Service) ListBannedUsers(ctx context.Context, clubID int64, query string
 	const op = "services.info.ListBannedUsers"
 	log := s.log.With(slog.String("op", op))
 
+	club, err := s.storage.GetClubByID(ctx, clubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			log.Error("club does not exists", logger.Err(err))
+			return nil, nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return nil, nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if club == nil {
+		return nil, nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
+	}
+
 	bannedUsers, metadata, err := s.storage.ListBannedUsers(ctx, clubID, query, filters)
 	if err != nil {
 		log.Error("failed to get banned users", logger.Err(err))

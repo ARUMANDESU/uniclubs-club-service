@@ -282,7 +282,22 @@ func (s Service) BanMember(ctx context.Context, dto dtos.BanMemberDTO) error {
 	const op = "services.membership.BanMember"
 	log := s.log.With(slog.String("op", op))
 
-	err := s.storage.RemoveMemberFromClub(ctx, dto.ClubID, dto.UserID)
+	_, isOwner, err := s.storage.GetUserRoles(ctx, dto.ClubID, dto.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+		default:
+			log.Error("failed to get user roles", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	if isOwner {
+		return domain.ErrOwnerCannotBeBanned
+	}
+
+	err = s.storage.RemoveMemberFromClub(ctx, dto.ClubID, dto.UserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrMemberNotFound) {
 			log.Debug("err member not found", logger.Err(err))

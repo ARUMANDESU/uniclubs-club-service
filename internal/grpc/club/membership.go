@@ -12,7 +12,6 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"log"
 )
 
 type MembershipService interface {
@@ -452,6 +451,8 @@ func (s serverApi) BanMemberFromClub(ctx context.Context, req *clubv1.BanMemberF
 			return nil, status.Error(codes.NotFound, err.Error())
 		case errors.Is(err, domain.ErrUserAlreadyBanned):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
+		case errors.Is(err, domain.ErrOwnerCannotBeBanned):
+			return nil, status.Error(codes.Aborted, domain.ErrOwnerCannotBeBanned.Error())
 		default:
 			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}
@@ -478,7 +479,6 @@ func (s serverApi) UnbanUserFromClub(ctx context.Context, req *clubv1.UnbanUserF
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 
-	log.Println(banRecord)
 	isAuthorized, err := s.permission.CanRevertAdminAction(ctx, req.GetClubId(), req.GetUserId(), banRecord.Admin.ID, domain.BanMember)
 	if err != nil {
 		switch {

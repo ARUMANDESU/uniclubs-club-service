@@ -267,7 +267,13 @@ func (s serverApi) ListBannedUsers(ctx context.Context, req *clubv1.ListBannedUs
 
 	banRecords, metadata, err := s.info.ListBannedUsers(ctx, req.GetClubId(), req.GetQuery(), f)
 	if err != nil {
-		return nil, status.Error(codes.Internal, ErrInternal.Error())
+		switch {
+		case errors.Is(err, info.ErrClubNotExists):
+			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+
 	}
 
 	return &clubv1.ListBannedUsersResponse{
