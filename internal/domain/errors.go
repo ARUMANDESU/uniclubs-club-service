@@ -27,4 +27,5 @@ var (
 	ErrOwnerCannotBeKickedOut                 = errors.New("owner cannot be kicked out from the club")
 	ErrUserAlreadyBanned                      = errors.New("user is already banned")
 	ErrUserNotBanned                          = errors.New("user is not banned")
+	ErrUserBanned                             = errors.New("user is banned")
 )

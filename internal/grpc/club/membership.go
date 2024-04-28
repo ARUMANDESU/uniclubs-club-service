@@ -46,6 +46,8 @@ func (s serverApi) RequestToJoinClub(ctx context.Context, req *clubv1.RequestToJ
 		switch {
 		case errors.Is(err, domain.ErrUserAlreadyClubMember), errors.Is(err, domain.ErrUserAlreadySentJoinRequest):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
+		case errors.Is(err, domain.ErrUserBanned):
+			return nil, status.Error(codes.PermissionDenied, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, ErrInternal.Error())
 		}

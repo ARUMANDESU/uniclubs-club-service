@@ -71,6 +71,15 @@ func (s Service) CreateJoinRequest(ctx context.Context, userID, clubID int64) er
 		return domain.ErrUserAlreadySentJoinRequest
 	}
 
+	banRecord, err := s.storage.GetBanRecord(ctx, clubID, userID)
+	if err != nil && !errors.Is(err, storage.ErrBanRecordNotExists) {
+		log.Error("failed to get ban record", logger.Err(err))
+		return err
+	}
+	if banRecord != nil {
+		return fmt.Errorf("cannot join club because %w", domain.ErrUserBanned)
+	}
+
 	err = s.storage.InsertJoinRequest(ctx, userID, clubID)
 	if err != nil {
 		log.Error("failed to create new join request", logger.Err(err))
