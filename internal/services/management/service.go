@@ -239,5 +239,32 @@ func (s Service) TransferOwnership(ctx context.Context, clubID, userID, targetID
 		}
 	}
 
+	notification := domain.Notification{
+		UserID:      targetID,
+		Message:     fmt.Sprintf("Now you are the owner of club '%s'", club.Name),
+		Description: fmt.Sprintf("You are now the owner of club '%s'", club.Name),
+		Status:      "NEW",
+		Severity:    "INFO",
+		Source:      "club",
+		DisplayType: "INBOX",
+		CreatedAt:   time.Now().String(),
+		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+	}
+	notificationToOldOwner := domain.Notification{
+		UserID:      userID,
+		Message:     fmt.Sprintf("You are no longer the owner of club '%s'", club.Name),
+		Description: fmt.Sprintf("You successfully transferred ownership of club '%s' to another user", club.Name),
+		Status:      "NEW",
+		Severity:    "INFO",
+		Source:      "club",
+		DisplayType: "INBOX",
+		CreatedAt:   time.Now().String(),
+		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+	}
+
+	go s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notification)
+
+	s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notificationToOldOwner)
+
 	return nil
 }
