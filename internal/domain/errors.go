@@ -26,6 +26,8 @@ var (
 	ErrOwnerCannotLeaveClub                   = errors.New("owner cannot leave the club, first pass on the ownership to other member")
 	ErrOwnerCannotBeKickedOut                 = errors.New("owner cannot be kicked out from the club")
 	ErrOwnerCannotBeBanned                    = errors.New("owner cannot be banned from the club")
+	ErrUserAlreadyClubOwner                   = errors.New("user is already club owner")
+	ErrUserNotClubOwner                       = errors.New("user is not club owner")
 	ErrUserAlreadyBanned                      = errors.New("user is already banned")
 	ErrUserNotBanned                          = errors.New("user is not banned")
 	ErrUserBanned                             = errors.New("user is banned")

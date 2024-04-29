@@ -183,14 +183,14 @@ func (s *Storage) UpdateClub(ctx context.Context, club *domain.Club) error {
 
 	query := `
         UPDATE clubs 
-        SET name = $2, description = $3, type = $4,
-            logo_url = $5, banner_url = $6, updated_at = current_timestamp
-        WHERE id = $1 AND approved AND updated_at = $7
+        SET name = $2, owner_id = $3, description = $4, type = $5,
+            logo_url = $6, banner_url = $7, updated_at = current_timestamp
+        WHERE id = $1 AND approved AND updated_at = $8
         returning updated_at
     `
 
 	args := []any{
-		club.ID, club.Name, club.Description,
+		club.ID, club.Name, club.OwnerID, club.Description,
 		club.ClubType, club.LogoURL, club.BannerURL,
 		club.UpdatedAt,
 	}

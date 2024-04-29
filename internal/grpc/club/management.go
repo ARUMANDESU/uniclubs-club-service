@@ -20,6 +20,7 @@ type ManagementService interface {
 	UpdateClub(ctx context.Context, club *domain.Club) error
 	UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*domain.Club, error)
 	UpdateBanner(ctx context.Context, clubID int64, banner []byte) (*domain.Club, error)
+	TransferOwnership(ctx context.Context, clubID, userID, targetID int64) error
 }
 
 func (s serverApi) CreateClub(ctx context.Context, req *clubv1.CreateClubRequest) (*empty.Empty, error) {
@@ -191,4 +192,33 @@ func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerReq
 	}
 
 	return club.ToClubObject(), nil
+}
+
+func (s serverApi) TransferOwnership(ctx context.Context, req *clubv1.TransferOwnershipRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1), validation.NotIn(req.GetTargetId())),
+		validation.Field(&req.TargetId, validation.Required, validation.Min(1)),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = s.management.TransferOwnership(ctx, req.GetClubId(), req.GetUserId(), req.GetTargetId())
+	if err != nil {
+		switch {
+		case errors.Is(err, management.ErrClubNotExists):
+			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
+			return nil, status.Error(codes.NotFound, ErrUserNotClubMember.Error())
+		case errors.Is(err, domain.ErrUserAlreadyClubOwner):
+			return nil, status.Error(codes.AlreadyExists, domain.ErrUserAlreadyClubOwner.Error())
+		case errors.Is(err, domain.ErrUserNotClubOwner):
+			return nil, status.Error(codes.PermissionDenied, domain.ErrUserNotClubOwner.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return &empty.Empty{}, nil
 }

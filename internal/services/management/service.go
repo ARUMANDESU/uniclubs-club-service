@@ -16,9 +16,8 @@ import (
 )
 
 var (
-	ErrFailedToBeginTx = errors.New("failed to begin transaction")
-	ErrClubNotExists   = errors.New("club does not exists")
-	ErrEditConflict    = errors.New("edit conflict")
+	ErrClubNotExists = errors.New("club does not exists")
+	ErrEditConflict  = errors.New("edit conflict")
 )
 
 type Service struct {
@@ -38,6 +37,7 @@ type Storage interface {
 	RejectClub(ctx context.Context, clubID int64) error
 	UpdateClub(ctx context.Context, club *domain.Club) error
 	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
+	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 }
 
 func New(log *slog.Logger, storage Storage, imageClient *image.Client, amqp Amqp) *Service {
@@ -179,6 +179,55 @@ func (s Service) UpdateClub(ctx context.Context, club *domain.Club) error {
 	log := s.log.With(slog.String("op", op))
 
 	err := s.storage.UpdateClub(ctx, club)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrEditConflict):
+			log.Error("edit club conflict", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, ErrEditConflict)
+		default:
+			log.Error("failed to get club by ID", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	return nil
+}
+
+func (s Service) TransferOwnership(ctx context.Context, clubID, userID, targetID int64) error {
+	const op = "services.management.TransferOwnership"
+	log := s.log.With(slog.String("op", op))
+
+	club, err := s.storage.GetClubByID(ctx, clubID)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			log.Error("club does not exists", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	if club.OwnerID != userID {
+		return fmt.Errorf("%s: %w", op, domain.ErrUserNotClubOwner)
+	}
+
+	_, isOwner, err := s.storage.GetUserRoles(ctx, clubID, targetID)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return fmt.Errorf("%s: %w", op, domain.ErrUserNotClubMember)
+		default:
+			log.Error("failed to get user roles", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+	if isOwner {
+		return fmt.Errorf("%w: %d", op, domain.ErrUserAlreadyClubOwner, targetID)
+	}
+
+	club.OwnerID = targetID
+
+	err = s.storage.UpdateClub(ctx, club)
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrEditConflict):
