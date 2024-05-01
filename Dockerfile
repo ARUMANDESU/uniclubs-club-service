@@ -8,26 +8,29 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+RUN apt-get update && apt-get install -y libvips-dev
 
 # Copy the rest of the application's source code.
 COPY . .
 
 # Build the application. This assumes you have a main package at the root of your project.
 # Adjust the path to the main package if it's located elsewhere.
-RUN CGO_ENABLED=0 GOOS=linux go build -o ./build/main ./cmd/
+RUN CGO_ENABLED=1 GOOS=linux go build -o ./build/main ./cmd/
 
 # Define environment variables for PostgreSQL and Redis connections.
 # These values can be overridden when running the container.
-ENV ENV="dev"\
-    DATABASE_DSN="postgres://postgres:password@postgres:5432/clubdb"\
-    GRPC_PORT=44045\
-    GRPC_TIMEOUT=1h\
-    RABBITMQ_USER="dsadsi21neoU@N!D"\
-    RABBITMQ_PASSWORD="Y98213KQSNDKJASKDLJNka"\
-    RABBITMQ_HOST="localhost"\
-    RABBITMQ_PORT="5672"\
-    RABBITMQ_USER_QUEUE="user"\
-    RABBITMQ_EXCHANGE_NAME="user_events"
+ENV ENV="dev"
+ENV DATABASE_DSN="postgres://postgres:password@postgres:5432/clubdb"
+ENV GRPC_PORT=44045
+ENV GRPC_TIMEOUT=1h
+ENV RABBITMQ_USER="dsadsi21neoU@N!D"
+ENV RABBITMQ_PASSWORD="Y98213KQSNDKJASKDLJNka"
+ENV RABBITMQ_HOST="localhost"
+ENV RABBITMQ_PORT="5672"
+ENV AWS_REGION="us-east-1"
+ENV AWS_ACCESS_KEY_ID="access_key_id"
+ENV AWS_SECRET_ACCESS_KEY="secret_access_key"
+ENV AWS_S3_BUCKET="bucket_name"
 
 # Expose the port your application listens on.
 EXPOSE 44045

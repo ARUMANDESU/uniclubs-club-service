@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ARUMANDESU/uniclubs-club-service/internal/clients/image"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
+	imageUtils "github.com/ARUMANDESU/uniclubs-club-service/pkg/image"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
-	imagev1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/filestorage"
 	"log/slog"
+	"path"
 	"time"
 )
 
@@ -21,14 +21,19 @@ var (
 )
 
 type Service struct {
-	log         *slog.Logger
-	amqp        Amqp
-	storage     Storage
-	imageClient *image.Client
+	log          *slog.Logger
+	amqp         Amqp
+	storage      Storage
+	imageStorage ImageStorage
 }
 
 type Amqp interface {
 	Publish(ctx context.Context, exchangeName string, routingKey string, msg any) error
+}
+
+type ImageStorage interface {
+	UploadImage(ctx context.Context, image []byte, filename string) (string, error)
+	DeleteImage(ctx context.Context, filename string) error
 }
 
 type Storage interface {
@@ -40,12 +45,12 @@ type Storage interface {
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 }
 
-func New(log *slog.Logger, storage Storage, imageClient *image.Client, amqp Amqp) *Service {
+func New(log *slog.Logger, storage Storage, imageStorage ImageStorage, amqp Amqp) *Service {
 	return &Service{
-		log:         log,
-		amqp:        amqp,
-		storage:     storage,
-		imageClient: imageClient,
+		log:          log,
+		amqp:         amqp,
+		storage:      storage,
+		imageStorage: imageStorage,
 	}
 }
 
@@ -104,12 +109,6 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 	const op = "services.management.UpdateLogo"
 	log := s.log.With(slog.String("op", op))
 
-	req, err := s.imageClient.UploadImage(ctx, &imagev1.UploadImageRequest{Image: logo, Filename: fmt.Sprintf("club-%d-logo", clubID)})
-	if err != nil {
-		log.Error("failed to update logo", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
 	club, err := s.storage.GetClubByID(ctx, clubID)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
@@ -120,7 +119,33 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	club.LogoURL = req.ImageUrl
+	// Delete previous club logo
+	if club.LogoURL != "" {
+		// path.Base returns the last element of the path: object key
+		err = s.imageStorage.DeleteImage(ctx, path.Base(club.LogoURL))
+		if err != nil {
+			log.Error("failed to delete previous avatar", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	// Compress image
+	compressImage, filename, err := imageUtils.CompressImage(logo, 75)
+	if err != nil {
+		log.Error("failed to compress image", logger.Err(err))
+		return nil, err
+	}
+
+	imageCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
+
+	url, err := s.imageStorage.UploadImage(imageCtx, compressImage, filename)
+	if err != nil {
+		log.Error("failed to upload avatar", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	club.LogoURL = url
 
 	err = s.storage.UpdateClub(ctx, club)
 	if err != nil {
@@ -141,12 +166,6 @@ func (s Service) UpdateBanner(ctx context.Context, clubID int64, banner []byte) 
 	const op = "services.management.UpdateBanner"
 	log := s.log.With(slog.String("op", op))
 
-	req, err := s.imageClient.UploadImage(ctx, &imagev1.UploadImageRequest{Image: banner, Filename: fmt.Sprintf("club-%d-banner", clubID)})
-	if err != nil {
-		log.Error("failed to update banner", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
 	club, err := s.storage.GetClubByID(ctx, clubID)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
@@ -157,7 +176,33 @@ func (s Service) UpdateBanner(ctx context.Context, clubID int64, banner []byte) 
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	club.BannerURL = req.ImageUrl
+	// Delete previous club banner
+	if club.LogoURL != "" {
+		// path.Base returns the last element of the path: object key
+		err = s.imageStorage.DeleteImage(ctx, path.Base(club.LogoURL))
+		if err != nil {
+			log.Error("failed to delete previous avatar", logger.Err(err))
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	// Compress image
+	compressImage, filename, err := imageUtils.CompressImage(banner, 75)
+	if err != nil {
+		log.Error("failed to compress image", logger.Err(err))
+		return nil, err
+	}
+
+	imageCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
+
+	url, err := s.imageStorage.UploadImage(imageCtx, compressImage, filename)
+	if err != nil {
+		log.Error("failed to upload avatar", logger.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	club.BannerURL = url
 
 	err = s.storage.UpdateClub(ctx, club)
 	if err != nil {
