@@ -41,7 +41,7 @@ type Storage interface {
 	ApproveClub(ctx context.Context, clubID int64) (int64, error)
 	RejectClub(ctx context.Context, clubID int64) error
 	UpdateClub(ctx context.Context, club *domain.Club) error
-	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
+	GetClubByID(ctx context.Context, clubID int64, isApproved bool) (*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 }
 
@@ -71,23 +71,54 @@ func (s Service) ApproveClub(ctx context.Context, clubID int64) error {
 	const op = "services.management.ApproveClub"
 	log := s.log.With(slog.String("op", op))
 
-	userID, err := s.storage.ApproveClub(ctx, clubID)
+	club, err := s.storage.GetClubByID(ctx, clubID, false)
+	if err != nil {
+		if errors.Is(err, storage.ErrClubNotExists) {
+			return fmt.Errorf("%s: %w", op, ErrClubNotExists)
+		}
+		log.Error("failed to get club by ID", logger.Err(err))
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	userID, err := s.storage.ApproveClub(ctx, club.ID)
 	if err != nil {
 		log.Error("failed to approve club", logger.Err(err))
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, domain.Notification{
-		UserID:      userID,
-		Message:     "Your club has been approved",
-		Description: "Your club has been approved and is now visible to other users",
-		Status:      "NEW",
-		Severity:    "INFO",
-		Source:      "club",
-		DisplayType: "INBOX",
-		CreatedAt:   time.Now().String(),
-		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
-	})
+	go func() {
+		err := s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, domain.Notification{
+			UserID:      userID,
+			Message:     "Your club has been approved",
+			Description: "Your club has been approved and is now visible to other users",
+			Status:      "NEW",
+			Severity:    "INFO",
+			Source:      "club",
+			DisplayType: "INBOX",
+			CreatedAt:   time.Now().String(),
+			ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+		})
+
+		if err != nil {
+			log.Error("failed to publish notification", logger.Err(err))
+		}
+
+		msg := map[string]interface{}{
+			"clubID": club.ID,
+			"name":   club.Name,
+			"logo":   club.LogoURL,
+		}
+
+		err = s.amqp.Publish(
+			ctx,
+			rabbitmq.ClubExchangeName,
+			rabbitmq.ClubEventActivatedRoutingKey,
+			msg,
+		)
+		if err != nil {
+			log.Error("failed to publish notification", logger.Err(err))
+		}
+	}()
 
 	return nil
 }
@@ -109,7 +140,7 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 	const op = "services.management.UpdateLogo"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID)
+	club, err := s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			log.Error("club does not exists", logger.Err(err))
@@ -159,6 +190,23 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 		}
 	}
 
+	go func() {
+		msg := map[string]interface{}{
+			"clubID": club.ID,
+			"logo":   club.LogoURL,
+		}
+
+		err = s.amqp.Publish(
+			ctx,
+			rabbitmq.ClubExchangeName,
+			rabbitmq.ClubEventUpdatedRoutingKey,
+			msg,
+		)
+		if err != nil {
+			log.Error("failed to publish notification", logger.Err(err))
+		}
+	}()
+
 	return club, nil
 }
 
@@ -166,7 +214,7 @@ func (s Service) UpdateBanner(ctx context.Context, clubID int64, banner []byte) 
 	const op = "services.management.UpdateBanner"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID)
+	club, err := s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			log.Error("club does not exists", logger.Err(err))
@@ -235,6 +283,23 @@ func (s Service) UpdateClub(ctx context.Context, club *domain.Club) error {
 		}
 	}
 
+	go func() {
+		msg := map[string]interface{}{
+			"clubID": club.ID,
+			"name":   club.Name,
+		}
+
+		err = s.amqp.Publish(
+			ctx,
+			rabbitmq.ClubExchangeName,
+			rabbitmq.ClubEventUpdatedRoutingKey,
+			msg,
+		)
+		if err != nil {
+			log.Error("failed to publish notification", logger.Err(err))
+		}
+	}()
+
 	return nil
 }
 
@@ -242,7 +307,7 @@ func (s Service) TransferOwnership(ctx context.Context, clubID, userID, targetID
 	const op = "services.management.TransferOwnership"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID)
+	club, err := s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			log.Error("club does not exists", logger.Err(err))

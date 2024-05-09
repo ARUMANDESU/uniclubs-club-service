@@ -23,7 +23,7 @@ type Service struct {
 }
 
 type Storage interface {
-	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
+	GetClubByID(ctx context.Context, clubID int64, isApproved bool) (*domain.Club, error)
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	GetUserClubsByID(ctx context.Context, userID int64) ([]*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
@@ -69,7 +69,7 @@ func (s Service) GetClub(ctx context.Context, clubID int64) (*domain.Club, error
 	const op = "services.info.GetClub"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID)
+	club, err := s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			return nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
@@ -219,7 +219,7 @@ func (s Service) ListBannedUsers(ctx context.Context, clubID int64, query string
 	const op = "services.info.ListBannedUsers"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID)
+	club, err := s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			log.Error("club does not exists", logger.Err(err))

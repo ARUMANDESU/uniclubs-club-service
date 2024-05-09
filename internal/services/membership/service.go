@@ -30,7 +30,7 @@ type Amqp interface {
 }
 
 type Storage interface {
-	GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error)
+	GetClubByID(ctx context.Context, clubID int64, isApproved bool) (*domain.Club, error)
 	InsertJoinRequest(ctx context.Context, userID, clubID int64) error
 	GetMemberByID(ctx context.Context, clubID, userID int64) (*domain.User, error)
 	AddNewMember(ctx context.Context, clubID, userID int64) error
@@ -328,7 +328,7 @@ func (s Service) BanMember(ctx context.Context, dto dtos.BanMemberDTO) error {
 		}
 	}
 
-	club, err := s.storage.GetClubByID(ctx, dto.ClubID)
+	club, err := s.storage.GetClubByID(ctx, dto.ClubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			return fmt.Errorf("%s: %w", op, info.ErrClubNotExists)
@@ -389,7 +389,7 @@ func (s Service) UnbanUser(ctx context.Context, dto dtos.UnbanUserDTO) error {
 		}
 	}
 
-	club, err := s.storage.GetClubByID(ctx, dto.ClubID)
+	club, err := s.storage.GetClubByID(ctx, dto.ClubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			return fmt.Errorf("%s: %w", op, info.ErrClubNotExists)
