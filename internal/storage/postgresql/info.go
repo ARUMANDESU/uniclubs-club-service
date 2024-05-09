@@ -10,19 +10,19 @@ import (
 	"time"
 )
 
-func (s *Storage) GetClubByID(ctx context.Context, clubID int64) (*domain.Club, error) {
+func (s *Storage) GetClubByID(ctx context.Context, clubID int64, isApproved bool) (*domain.Club, error) {
 	const op = "storage.postgresql.GetClubByID"
 
 	clubQuery := `
         SELECT id, owner_id, name, description, type, logo_url, banner_url, created_at, updated_at, COUNT(user_id) as member_count
         FROM clubs c
         LEFT JOIN clubs_users cu ON c.id = cu.club_id
-        WHERE c.id = $1 AND approved
+        WHERE c.id = $1 AND approved = $2
         GROUP BY c.id;
     `
 
 	var club domain.Club
-	err := s.DB.QueryRowContext(ctx, clubQuery, clubID).Scan(
+	err := s.DB.QueryRowContext(ctx, clubQuery, clubID, isApproved).Scan(
 		&club.ID,
 		&club.OwnerID,
 		&club.Name,

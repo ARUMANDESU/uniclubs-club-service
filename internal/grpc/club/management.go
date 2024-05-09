@@ -56,6 +56,9 @@ func (s serverApi) HandleNewClub(ctx context.Context, req *clubv1.HandleNewClubR
 		err = s.management.RejectClub(ctx, req.GetClubId())
 	}
 	if err != nil {
+		if errors.Is(err, management.ErrClubNotExists) {
+			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
+		}
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}
 

@@ -19,6 +19,8 @@ const (
 	UserUpdatedEventRoutingKey   = "user.event.updated"
 	UserActivatedEventRoutingKey = "user.event.activated"
 	UserDeletedEventRoutingKey   = "user.event.deleted"
+	ClubEventUpdatedRoutingKey   = "club.event.updated"
+	ClubEventActivatedRoutingKey = "club.event.activated"
 )
 
 type Handler func(msg amqp.Delivery) error
