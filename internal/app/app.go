@@ -23,7 +23,7 @@ type App struct {
 }
 
 func New(log *slog.Logger, cfg *config.Config, awsCfg aws.Config) *App {
-	const op = "App.New"
+	const op = "app.new"
 	l := log.With(slog.String("op", op))
 
 	storage, err := postgresql.New(cfg.DatabaseDSN)

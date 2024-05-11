@@ -104,9 +104,9 @@ func (s Service) ApproveClub(ctx context.Context, clubID int64) error {
 		}
 
 		msg := map[string]interface{}{
-			"clubID": club.ID,
-			"name":   club.Name,
-			"logo":   club.LogoURL,
+			"id":       club.ID,
+			"name":     club.Name,
+			"logo_url": club.LogoURL,
 		}
 
 		err = s.amqp.Publish(
@@ -192,8 +192,8 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 
 	go func() {
 		msg := map[string]interface{}{
-			"clubID": club.ID,
-			"logo":   club.LogoURL,
+			"id":       club.ID,
+			"logo_url": club.LogoURL,
 		}
 
 		err = s.amqp.Publish(
@@ -285,8 +285,8 @@ func (s Service) UpdateClub(ctx context.Context, club *domain.Club) error {
 
 	go func() {
 		msg := map[string]interface{}{
-			"clubID": club.ID,
-			"name":   club.Name,
+			"id":   club.ID,
+			"name": club.Name,
 		}
 
 		err = s.amqp.Publish(
@@ -349,32 +349,38 @@ func (s Service) TransferOwnership(ctx context.Context, clubID, userID, targetID
 		}
 	}
 
-	notification := domain.Notification{
-		UserID:      targetID,
-		Message:     fmt.Sprintf("Now you are the owner of club '%s'", club.Name),
-		Description: fmt.Sprintf("You are now the owner of club '%s'", club.Name),
-		Status:      "NEW",
-		Severity:    "INFO",
-		Source:      "club",
-		DisplayType: "INBOX",
-		CreatedAt:   time.Now().String(),
-		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
-	}
-	notificationToOldOwner := domain.Notification{
-		UserID:      userID,
-		Message:     fmt.Sprintf("You are no longer the owner of club '%s'", club.Name),
-		Description: fmt.Sprintf("You successfully transferred ownership of club '%s' to another user", club.Name),
-		Status:      "NEW",
-		Severity:    "INFO",
-		Source:      "club",
-		DisplayType: "INBOX",
-		CreatedAt:   time.Now().String(),
-		ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
-	}
-
-	go s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notification)
-
-	s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notificationToOldOwner)
+	go func() {
+		notification := domain.Notification{
+			UserID:      targetID,
+			Message:     fmt.Sprintf("Now you are the owner of club '%s'", club.Name),
+			Description: fmt.Sprintf("You are now the owner of club '%s'", club.Name),
+			Status:      "NEW",
+			Severity:    "INFO",
+			Source:      "club",
+			DisplayType: "INBOX",
+			CreatedAt:   time.Now().String(),
+			ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+		}
+		notificationToOldOwner := domain.Notification{
+			UserID:      userID,
+			Message:     fmt.Sprintf("You are no longer the owner of club '%s'", club.Name),
+			Description: fmt.Sprintf("You successfully transferred ownership of club '%s' to another user", club.Name),
+			Status:      "NEW",
+			Severity:    "INFO",
+			Source:      "club",
+			DisplayType: "INBOX",
+			CreatedAt:   time.Now().String(),
+			ExpiryAt:    time.Now().Add(time.Hour * 24 * 2).String(),
+		}
+		err := s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notification)
+		if err != nil {
+			log.Warn("failed to send notification", logger.Err(err))
+		}
+		err = s.amqp.Publish(ctx, rabbitmq.UserExchangeName, rabbitmq.PushNotificationRoutingKey, notificationToOldOwner)
+		if err != nil {
+			log.Warn("failed to send notification", logger.Err(err))
+		}
+	}()
 
 	return nil
 }
