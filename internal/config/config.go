@@ -13,17 +13,11 @@ type Config struct {
 	GRPC        GRPC     `yaml:"grpc"`
 	Rabbitmq    Rabbitmq `yaml:"rabbitmq"`
 	DatabaseDSN string   `yaml:"database_dsn" env:"DATABASE_DSN" env-required:"true"`
-	AWS         AWS      `yaml:"aws"`
 }
 
 type GRPC struct {
 	Port    int           `yaml:"port" env:"GRPC_PORT"`
 	Timeout time.Duration `yaml:"timeout" env:"GRPC_TIMEOUT"`
-}
-
-type AWS struct {
-	Region string `yaml:"region" env:"AWS_REGION"`
-	Bucket string `yaml:"bucket" env:"AWS_S3_BUCKET"`
 }
 
 type Rabbitmq struct {

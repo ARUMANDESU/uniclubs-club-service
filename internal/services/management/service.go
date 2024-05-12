@@ -8,10 +8,8 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
-	imageUtils "github.com/ARUMANDESU/uniclubs-club-service/pkg/image"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	"log/slog"
-	"path"
 	"time"
 )
 
@@ -21,19 +19,13 @@ var (
 )
 
 type Service struct {
-	log          *slog.Logger
-	amqp         Amqp
-	storage      Storage
-	imageStorage ImageStorage
+	log     *slog.Logger
+	amqp    Amqp
+	storage Storage
 }
 
 type Amqp interface {
 	Publish(ctx context.Context, exchangeName string, routingKey string, msg any) error
-}
-
-type ImageStorage interface {
-	UploadImage(ctx context.Context, image []byte, filename string) (string, error)
-	DeleteImage(ctx context.Context, filename string) error
 }
 
 type Storage interface {
@@ -45,12 +37,11 @@ type Storage interface {
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
 }
 
-func New(log *slog.Logger, storage Storage, imageStorage ImageStorage, amqp Amqp) *Service {
+func New(log *slog.Logger, storage Storage, amqp Amqp) *Service {
 	return &Service{
-		log:          log,
-		amqp:         amqp,
-		storage:      storage,
-		imageStorage: imageStorage,
+		log:     log,
+		amqp:    amqp,
+		storage: storage,
 	}
 }
 
@@ -136,57 +127,35 @@ func (s Service) RejectClub(ctx context.Context, clubID int64) error {
 	return nil
 }
 
-func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*domain.Club, error) {
+func (s Service) UpdateLogo(ctx context.Context, clubID int64, logoUrl string) (club *domain.Club, prevLogoUrl string, err error) {
 	const op = "services.management.UpdateLogo"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID, true)
+	club, err = s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			log.Error("club does not exists", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
+			return nil, "", fmt.Errorf("%s: %w", op, ErrClubNotExists)
 		}
 		log.Error("failed to get club by ID", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, "", fmt.Errorf("%s: %w", op, err)
 	}
 
-	// Delete previous club logo
 	if club.LogoURL != "" {
-		// path.Base returns the last element of the path: object key
-		err = s.imageStorage.DeleteImage(ctx, path.Base(club.LogoURL))
-		if err != nil {
-			log.Error("failed to delete previous avatar", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, err)
-		}
+		prevLogoUrl = club.LogoURL
 	}
 
-	// Compress image
-	compressImage, filename, err := imageUtils.CompressImage(logo, 75)
-	if err != nil {
-		log.Error("failed to compress image", logger.Err(err))
-		return nil, err
-	}
-
-	imageCtx, cancel := context.WithTimeout(ctx, time.Second*20)
-	defer cancel()
-
-	url, err := s.imageStorage.UploadImage(imageCtx, compressImage, filename)
-	if err != nil {
-		log.Error("failed to upload avatar", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
-	club.LogoURL = url
+	club.LogoURL = logoUrl
 
 	err = s.storage.UpdateClub(ctx, club)
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrEditConflict):
 			log.Error("edit club conflict", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, ErrEditConflict)
+			return nil, "", fmt.Errorf("%s: %w", op, ErrEditConflict)
 		default:
 			log.Error("failed to get club by ID", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, err)
+			return nil, "", fmt.Errorf("%s: %w", op, err)
 		}
 	}
 
@@ -207,64 +176,42 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*do
 		}
 	}()
 
-	return club, nil
+	return club, prevLogoUrl, nil
 }
 
-func (s Service) UpdateBanner(ctx context.Context, clubID int64, banner []byte) (*domain.Club, error) {
+func (s Service) UpdateBanner(ctx context.Context, clubID int64, bannerUrl string) (club *domain.Club, prevBannerUrl string, err error) {
 	const op = "services.management.UpdateBanner"
 	log := s.log.With(slog.String("op", op))
 
-	club, err := s.storage.GetClubByID(ctx, clubID, true)
+	club, err = s.storage.GetClubByID(ctx, clubID, true)
 	if err != nil {
 		if errors.Is(err, storage.ErrClubNotExists) {
 			log.Error("club does not exists", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, ErrClubNotExists)
+			return nil, "", fmt.Errorf("%s: %w", op, ErrClubNotExists)
 		}
 		log.Error("failed to get club by ID", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, "", fmt.Errorf("%s: %w", op, err)
 	}
 
-	// Delete previous club banner
-	if club.LogoURL != "" {
-		// path.Base returns the last element of the path: object key
-		err = s.imageStorage.DeleteImage(ctx, path.Base(club.LogoURL))
-		if err != nil {
-			log.Error("failed to delete previous avatar", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, err)
-		}
+	if club.BannerURL != "" {
+		prevBannerUrl = club.BannerURL
 	}
 
-	// Compress image
-	compressImage, filename, err := imageUtils.CompressImage(banner, 75)
-	if err != nil {
-		log.Error("failed to compress image", logger.Err(err))
-		return nil, err
-	}
-
-	imageCtx, cancel := context.WithTimeout(ctx, time.Second*20)
-	defer cancel()
-
-	url, err := s.imageStorage.UploadImage(imageCtx, compressImage, filename)
-	if err != nil {
-		log.Error("failed to upload avatar", logger.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
-	club.BannerURL = url
+	club.BannerURL = bannerUrl
 
 	err = s.storage.UpdateClub(ctx, club)
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrEditConflict):
 			log.Error("edit club conflict", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, ErrEditConflict)
+			return nil, "", fmt.Errorf("%s: %w", op, ErrEditConflict)
 		default:
 			log.Error("failed to get club by ID", logger.Err(err))
-			return nil, fmt.Errorf("%s: %w", op, err)
+			return nil, "", fmt.Errorf("%s: %w", op, err)
 		}
 	}
 
-	return club, nil
+	return club, prevBannerUrl, nil
 }
 
 func (s Service) UpdateClub(ctx context.Context, club *domain.Club) error {

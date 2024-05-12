@@ -1,11 +1,8 @@
 package main
 
 import (
-	"context"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/app"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/config"
-	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
-	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/joho/godotenv"
 	"log/slog"
 	"os"
@@ -34,13 +31,7 @@ func main() {
 		slog.Int("port", cfg.GRPC.Port),
 	)
 
-	awsCfg, err := awsConfig.LoadDefaultConfig(context.Background())
-	if err != nil {
-		log.Error("error loading aws config", logger.Err(err))
-		panic(err)
-	}
-
-	application := app.New(log, cfg, awsCfg)
+	application := app.New(log, cfg)
 
 	go application.GRPCSrv.MustRun()
 	application.AMQPApp.SetupMessageConsumers()

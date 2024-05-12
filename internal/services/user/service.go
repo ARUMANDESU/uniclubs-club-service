@@ -37,7 +37,7 @@ func New(log *slog.Logger, storage Storage) *Service {
 }
 
 func (s Service) HandleCreateUser(msg amqp091.Delivery) error {
-	const op = "rabbitmq.user.activated"
+	const op = "rabbitmq.user.handleCreateUser"
 
 	log := s.log.With(slog.String("op", op))
 
@@ -66,7 +66,7 @@ func (s Service) HandleCreateUser(msg amqp091.Delivery) error {
 }
 
 func (s Service) HandleUpdateUser(msg amqp091.Delivery) error {
-	const op = "rabbitmq.user.activated"
+	const op = "rabbitmq.user.handleUpdateUser"
 
 	log := s.log.With(slog.String("op", op))
 
@@ -125,7 +125,7 @@ func (s Service) HandleUpdateUser(msg amqp091.Delivery) error {
 }
 
 func (s Service) HandleDeleteUser(msg amqp091.Delivery) error {
-	const op = "rabbitmq.user.activated"
+	const op = "rabbitmq.user.handleDeleteUser"
 
 	log := s.log.With(slog.String("op", op))
 

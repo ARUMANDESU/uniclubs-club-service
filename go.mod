@@ -3,7 +3,7 @@ module github.com/ARUMANDESU/uniclubs-club-service
 go 1.21.5
 
 require (
-	github.com/ARUMANDESU/uniclubs-protos v0.3.6
+	github.com/ARUMANDESU/uniclubs-protos v0.3.8
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.11
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.15

@@ -18,8 +18,8 @@ type ManagementService interface {
 	ApproveClub(ctx context.Context, clubID int64) error
 	RejectClub(ctx context.Context, clubID int64) error
 	UpdateClub(ctx context.Context, club *domain.Club) error
-	UpdateLogo(ctx context.Context, clubID int64, logo []byte) (*domain.Club, error)
-	UpdateBanner(ctx context.Context, clubID int64, banner []byte) (*domain.Club, error)
+	UpdateLogo(ctx context.Context, clubID int64, logoUrl string) (*domain.Club, string, error)
+	UpdateBanner(ctx context.Context, clubID int64, bannerUrl string) (*domain.Club, string, error)
 	TransferOwnership(ctx context.Context, clubID, userID, targetID int64) error
 }
 
@@ -125,11 +125,11 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 
 }
 
-func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest) (*clubv1.ClubObject, error) {
+func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest) (*clubv1.UpdateLogoResponse, error) {
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
-		validation.Field(&req.Logo, validation.Required),
+		validation.Field(&req.LogoUrl, validation.Required),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -146,7 +146,7 @@ func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
 	}
 
-	club, err := s.management.UpdateLogo(ctx, req.GetClubId(), req.GetLogo())
+	res, prevLogoUrl, err := s.management.UpdateLogo(ctx, req.GetClubId(), req.GetLogoUrl())
 	if err != nil {
 		switch {
 		case errors.Is(err, management.ErrClubNotExists):
@@ -158,14 +158,17 @@ func (s serverApi) UpdateLogo(ctx context.Context, req *clubv1.UpdateLogoRequest
 		}
 	}
 
-	return club.ToClubObject(), nil
+	return &clubv1.UpdateLogoResponse{
+		Club:        res.ToClubObject(),
+		PrevLogoUrl: prevLogoUrl,
+	}, nil
 }
 
-func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerRequest) (*clubv1.ClubObject, error) {
+func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerRequest) (*clubv1.UpdateBannerResponse, error) {
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
-		validation.Field(&req.Banner, validation.Required),
+		validation.Field(&req.BannerUrl, validation.Required),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -182,7 +185,7 @@ func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerReq
 		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
 	}
 
-	club, err := s.management.UpdateBanner(ctx, req.GetClubId(), req.GetBanner())
+	res, prevBannerUrl, err := s.management.UpdateBanner(ctx, req.GetClubId(), req.GetBannerUrl())
 	if err != nil {
 		switch {
 		case errors.Is(err, management.ErrClubNotExists):
@@ -194,7 +197,10 @@ func (s serverApi) UpdateBanner(ctx context.Context, req *clubv1.UpdateBannerReq
 		}
 	}
 
-	return club.ToClubObject(), nil
+	return &clubv1.UpdateBannerResponse{
+		Club:          res.ToClubObject(),
+		PrevBannerUrl: prevBannerUrl,
+	}, nil
 }
 
 func (s serverApi) TransferOwnership(ctx context.Context, req *clubv1.TransferOwnershipRequest) (*empty.Empty, error) {
