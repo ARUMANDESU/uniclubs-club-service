@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"time"
+
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/rabbitmq"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
-	"log/slog"
-	"time"
 )
 
 var (
@@ -279,7 +280,7 @@ func (s Service) TransferOwnership(ctx context.Context, clubID, userID, targetID
 		}
 	}
 	if isOwner {
-		return fmt.Errorf("%w: %d", op, domain.ErrUserAlreadyClubOwner, targetID)
+		return fmt.Errorf("%w: %d", domain.ErrUserAlreadyClubOwner, targetID)
 	}
 
 	club.OwnerID = targetID

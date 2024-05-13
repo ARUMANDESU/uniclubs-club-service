@@ -29,3 +29,9 @@ tasks:
 
   migrate:down:
     cmd: migrate -path ./migrations -database {{.DATABASE_DSN}} down
+  
+  test:coverage:
+    cmd: go test -coverprofile=./tests/c.out ./... || go tool cover -html="./tests/c.out"
+
+  test:unit:
+    cmd: go test -v ./...

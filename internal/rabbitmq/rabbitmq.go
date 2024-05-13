@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/config"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"log/slog"
 )
 
 const (
@@ -97,7 +98,7 @@ func (r *Rabbitmq) Consume(queue, routingKey string, handler func(msg amqp.Deliv
 	const op = "Rabbitmq.Consume"
 	log := r.log.With(
 		slog.String("op", op),
-		slog.With("queue", queue),
+		slog.String("queue", queue),
 	)
 
 	err := r.ch.Qos(

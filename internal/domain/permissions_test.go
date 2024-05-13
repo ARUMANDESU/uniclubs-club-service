@@ -18,16 +18,12 @@ func TestPermissions_HexToStringArr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := Permissions{PermissionsHex: tt.hex}
-			err := p.HexToStringArr()
-			if err != nil {
-				t.Fatalf("HexToStringArr() error = %v", err)
-			}
-			if len(p.PermissionsArr) != len(tt.expected) {
-				t.Fatalf("Expected %v, got %v", tt.expected, p.PermissionsArr)
+			gotArrPerms := PermissionsHexToStringArr(tt.hex)
+			if len(gotArrPerms) != len(tt.expected) {
+				t.Fatalf("Expected %v, got %v", tt.expected, gotArrPerms)
 
 			}
-			slicesEqual(t, tt.expected, p.PermissionsArr)
+			slicesEqual(t, tt.expected, gotArrPerms)
 
 		})
 	}
@@ -47,13 +43,12 @@ func TestStringArrToHex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := Permissions{PermissionsArr: tt.permissions}
-			hex, err := StringArrToHex(p.PermissionsArr)
+			hex, err := StringArrToHex(tt.permissions)
 			if err != nil {
 				t.Fatalf("StringArrToHex() error = %v", err)
 			}
 			if hex != tt.expected {
-				t.Errorf("Expected %v, got %v", tt.expected, p.PermissionsHex)
+				t.Errorf("Expected %v, got %v", tt.expected, hex)
 			}
 		})
 
@@ -63,15 +58,15 @@ func TestStringArrToHex(t *testing.T) {
 func TestAccumulatePermissions(t *testing.T) {
 	tests := []struct {
 		name  string
-		roles []Role
+		roles []*Role
 		want  uint64
 	}{
-		{"NoPermissions", []Role{}, 0},
-		{"SinglePermission", []Role{{Permissions: Permissions{PermissionsHex: ManageClub}}}, ManageClub},
-		{"MultiplePermissions", []Role{
-			{Permissions: Permissions{PermissionsHex: ManageClub}},
-			{Permissions: Permissions{PermissionsHex: ManageMembership}},
-			{Permissions: Permissions{PermissionsHex: KickMember}},
+		{"NoPermissions", []*Role{}, 0},
+		{"SinglePermission", []*Role{{Permissions: ManageClub}}, ManageClub},
+		{"MultiplePermissions", []*Role{
+			{Permissions: ManageClub},
+			{Permissions: ManageMembership},
+			{Permissions: KickMember},
 		},
 			ManageClub | ManageMembership | KickMember},
 	}
