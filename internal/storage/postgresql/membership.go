@@ -210,6 +210,9 @@ func (s *Storage) DeleteRoleByID(ctx context.Context, clubID, roleID int64) erro
 		}
 	}()
 
+	// action -> Transaction[actions proverka if everything OK ] -> Commit
+	// rollback -> Transaction[actions proverka if something went wrong] -> Rollback
+
 	_, err = tx.ExecContext(ctx, `DELETE FROM users_roles WHERE role_id = $1`, roleID)
 	if err != nil {
 		tx.Rollback()
@@ -629,4 +632,62 @@ func (s *Storage) GetBanRecord(ctx context.Context, clubID, userID int64) (*doma
 	}
 
 	return &banRecord, nil
+}
+
+func (s *Storage) DeleteClubByID(ctx context.Context, clubID int64) error {
+	const op = "storage.postgresql.DeleteClubByID"
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM clubs_users WHERE club_id = $1`, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete club members: %w", op, err)
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM users_roles WHERE role_id IN (SELECT id FROM roles WHERE club_id = $1)`, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete user roles: %w", op, err)
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM roles WHERE club_id = $1`, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete club roles: %w", op, err)
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM join_club_requests WHERE club_id = $1`, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete club join requests: %w", op, err)
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM bans WHERE club_id = $1`, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete club bans: %w", op, err)
+	}
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM clubs WHERE id = $1`, clubID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("%s: failed to delete club: %w", op, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: transaction commit failed: %w", op, err)
+	}
+
+	return nil
 }
