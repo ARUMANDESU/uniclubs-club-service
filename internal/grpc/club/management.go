@@ -14,6 +14,7 @@ import (
 )
 
 type ManagementService interface {
+	// interface
 	CreateClub(ctx context.Context, dto dtos.CreateClubDTO) error
 	ApproveClub(ctx context.Context, clubID int64) error
 	RejectClub(ctx context.Context, clubID int64) error
@@ -21,6 +22,43 @@ type ManagementService interface {
 	UpdateLogo(ctx context.Context, clubID int64, logoUrl string) (*domain.Club, string, error)
 	UpdateBanner(ctx context.Context, clubID int64, bannerUrl string) (*domain.Club, string, error)
 	TransferOwnership(ctx context.Context, clubID, userID, targetID int64) error
+	DeleteClub(ctx context.Context, clubID int64) error
+}
+
+func (s serverApi) DeleteClub(ctx context.Context, req *clubv1.DeleteClubRequest) (*empty.Empty, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.CanDelete, validation.Required),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	isAuthorized, err := s.permission.CanDeleteClub(ctx, req.GetClubId(), req.GetUserId(), req.GetCanDelete())
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotClubOwner) {
+			return nil, status.Error(codes.PermissionDenied, domain.ErrUserNotClubOwner.Error())
+		}
+		return nil, status.Error(codes.Internal, ErrInternal.Error())
+	}
+	if !isAuthorized {
+		return nil, status.Error(codes.PermissionDenied, ErrUserNonAuthorized.Error())
+	}
+
+	err = s.management.DeleteClub(ctx, req.GetClubId())
+	if err != nil {
+		switch {
+		case errors.Is(err, management.ErrClubNotExists):
+			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
+		case errors.Is(err, domain.ErrUserNotClubOwner):
+			return nil, status.Error(codes.PermissionDenied, domain.ErrUserNotClubOwner.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return &empty.Empty{}, nil
 }
 
 func (s serverApi) CreateClub(ctx context.Context, req *clubv1.CreateClubRequest) (*empty.Empty, error) {

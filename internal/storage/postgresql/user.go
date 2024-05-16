@@ -121,23 +121,42 @@ func (s *Storage) UpdateUser(ctx context.Context, user *domain.User) error {
 func (s *Storage) DeleteUserByID(ctx context.Context, userID int64) error {
 	const op = "storage.postgresql.DeleteUserByID"
 
-	stmt, err := s.DB.Prepare(`DELETE FROM users WHERE id = $1;`)
+	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("%s: failed to begin transaction: %w", op, err)
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx, `DELETE FROM bans WHERE user_id = $1;`, userID)
+	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: %w", op, err)
 	}
-	defer stmt.Close()
 
-	result, err := stmt.ExecContext(ctx, userID)
+	result, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = $1;`, userID)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: %w", op, err)
 	}
 	if rowsAffected == 0 {
+		tx.Rollback()
 		return fmt.Errorf("%s: %w", op, storage.ErrUserNotExists)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil

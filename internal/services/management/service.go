@@ -36,6 +36,7 @@ type Storage interface {
 	UpdateClub(ctx context.Context, club *domain.Club) error
 	GetClubByID(ctx context.Context, clubID int64, isApproved bool) (*domain.Club, error)
 	GetUserRoles(ctx context.Context, clubID, userID int64) (roles []*domain.Role, isOwner bool, err error)
+	DeleteClubByID(ctx context.Context, clubID int64) error
 }
 
 func New(log *slog.Logger, storage Storage, amqp Amqp) *Service {
@@ -329,6 +330,29 @@ func (s Service) TransferOwnership(ctx context.Context, clubID, userID, targetID
 			log.Warn("failed to send notification", logger.Err(err))
 		}
 	}()
+
+	return nil
+}
+
+func (s Service) DeleteClub(ctx context.Context, clubID int64) error {
+	const op = "services.management.DeleteClubByID"
+	log := s.log.With(slog.String("op", op))
+
+	err := s.storage.DeleteClubByID(ctx, clubID)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrClubNotExists):
+			log.Error("club does not exists", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, ErrClubNotExists)
+		case errors.Is(err, domain.ErrUserNotClubOwner):
+			log.Error("user is not club owner", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, domain.ErrUserNotClubOwner)
+		default:
+			log.Error("failed to delete club", logger.Err(err))
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
 
 	return nil
 }

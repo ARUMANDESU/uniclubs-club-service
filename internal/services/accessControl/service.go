@@ -363,3 +363,29 @@ func (s *Service) CanChangeRolesPositions(ctx context.Context, clubID, userID in
 
 	return true, nil
 }
+
+func (s *Service) CanDeleteClub(ctx context.Context, clubID, userID int64, canDelete bool) (bool, error) {
+	const op = "service.accessControl.CanDeleteClub"
+	log := s.log.With(slog.String("op", op))
+
+	if canDelete {
+		return true, nil
+	}
+
+	_, isUserOwner, err := s.storage.GetUserRoles(ctx, clubID, userID)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrUserNotClubMember):
+			return false, domain.ErrUserNotClubMember
+		default:
+			log.Error("failed to get user permissions", logger.Err(err))
+			return false, fmt.Errorf("%s: %w", op, err)
+		}
+	}
+	if isUserOwner {
+		return true, nil
+	}
+
+	return false, nil
+}
