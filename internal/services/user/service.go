@@ -96,7 +96,6 @@ func (s Service) HandleUpdateUser(msg amqp091.Delivery) error {
 			log.Error("failed to get user", logger.Err(err))
 			return fmt.Errorf("%s: %w", op, err)
 		}
-
 	}
 
 	if input.FirstName != nil {
