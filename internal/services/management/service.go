@@ -339,7 +339,6 @@ func (s Service) DeleteClub(ctx context.Context, clubID int64) error {
 	log := s.log.With(slog.String("op", op))
 
 	err := s.storage.DeleteClubByID(ctx, clubID)
-
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrClubNotExists):

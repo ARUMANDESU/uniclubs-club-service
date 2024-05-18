@@ -29,7 +29,6 @@ func (s serverApi) DeleteClub(ctx context.Context, req *clubv1.DeleteClubRequest
 	err := validation.ValidateStruct(req,
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
-		validation.Field(&req.CanDelete, validation.Required),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
