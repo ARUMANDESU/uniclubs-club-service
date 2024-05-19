@@ -164,9 +164,9 @@ func (s Service) UpdateLogo(ctx context.Context, clubID int64, logoUrl string) (
 	go func() {
 		msg := map[string]interface{}{
 			"id":       club.ID,
+			"name":     club.Name,
 			"logo_url": club.LogoURL,
 		}
-
 		err = s.amqp.Publish(
 			ctx,
 			rabbitmq.ClubExchangeName,
@@ -234,8 +234,9 @@ func (s Service) UpdateClub(ctx context.Context, club *domain.Club) error {
 
 	go func() {
 		msg := map[string]interface{}{
-			"id":   club.ID,
-			"name": club.Name,
+			"id":       club.ID,
+			"name":     club.Name,
+			"logo_url": club.LogoURL,
 		}
 
 		err = s.amqp.Publish(

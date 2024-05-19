@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  DATABASE_DSN: postgresql://postgres:password@172.17.0.1:5432/clubdb?sslmode=disable
+  DATABASE_DSN: postgresql://postgres:password@localhost:5432/clubdb
 
 tasks:
   run:local:
@@ -25,10 +25,10 @@ tasks:
     cmd: docker build -t arumandesu/club-service -t arumandesu/club-service:0.0.6 . && docker push arumandesu/club-service -a
 
   migrate:up:
-    cmd: migrate -path ./migrations -database {{.DATABASE_DSN}} up
+    cmd: migrate -path ./migrations -database {{.DATABASE_DSN}}?sslmode=disable up
 
   migrate:down:
-    cmd: migrate -path ./migrations -database {{.DATABASE_DSN}} down
+    cmd: migrate -path ./migrations -database {{.DATABASE_DSN}}?sslmode=disable down
   
   test:coverage:
     cmd: go test -coverprofile=./tests/c.out ./... || go tool cover -html="./tests/c.out"
