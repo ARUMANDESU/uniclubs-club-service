@@ -36,6 +36,7 @@ type PermissionService interface {
 	CanChangeRolesPositions(ctx context.Context, clubID, userID int64, roles []*dtos.ChangeRolesPositionDTO) (bool, error)
 	CanRevertAdminAction(ctx context.Context, clubID, userID, adminID int64, permission uint64) (bool, error)
 	CanDeleteClub(ctx context.Context, clubID, userID int64, canDelete bool) (bool, error)
+	HavePermissionTo(ctx context.Context, clubID, userID int64, permission uint64) (bool, error)
 }
 
 func Register(

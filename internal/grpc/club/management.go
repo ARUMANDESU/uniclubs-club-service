@@ -268,3 +268,28 @@ func (s serverApi) TransferOwnership(ctx context.Context, req *clubv1.TransferOw
 
 	return &empty.Empty{}, nil
 }
+
+func (s serverApi) HavePermissionTo(ctx context.Context, req *clubv1.HavePermissionToRequest) (*clubv1.HavePermissionToResponse, error) {
+	err := validation.ValidateStruct(req,
+		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
+		validation.Field(&req.UserId, validation.Required, validation.Min(1)),
+		validation.Field(&req.Permission, validation.Required),
+	)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	res, err := s.permission.HavePermissionTo(ctx, req.GetClubId(), req.GetUserId(), req.GetPermission())
+	if err != nil {
+		switch {
+		case errors.Is(err, management.ErrClubNotExists):
+			return nil, status.Error(codes.NotFound, ErrClubNotFound.Error())
+		case errors.Is(err, domain.ErrUserNotClubMember):
+			return nil, status.Error(codes.NotFound, ErrUserNotClubMember.Error())
+		default:
+			return nil, status.Error(codes.Internal, ErrInternal.Error())
+		}
+	}
+
+	return &clubv1.HavePermissionToResponse{HasPermission: res}, nil
+}

@@ -91,6 +91,8 @@ func TestHasPermission(t *testing.T) {
 		{"DoesNotHavePermission", ManageRoles, ManageMembership, false},
 		{"MultiplePermissionsTrue", ManageClub | BanMember, ManageClub, true},
 		{"MultiplePermissionsFalse", ManageRoles | KickMember, BanMember, false},
+		{"ManageEvents", ManageEvents, ManageEvents, true},
+		{"WontManageEvents", ManageRoles, ManageEvents, false},
 	}
 
 	for _, tt := range tests {

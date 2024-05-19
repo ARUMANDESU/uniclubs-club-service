@@ -9,7 +9,8 @@ const (
 	KickMember
 	BanMember
 	ManageRoles
-	ALL = Administrator | ManageRoles | ManageMembership | KickMember | BanMember | ManageClub
+	ManageEvents
+	ALL = Administrator | ManageRoles | ManageMembership | KickMember | BanMember | ManageClub | ManageEvents
 )
 
 var Names = map[uint64]string{
@@ -19,6 +20,7 @@ var Names = map[uint64]string{
 	KickMember:       "KickMember",
 	BanMember:        "BanMember",
 	ManageRoles:      "ManageRoles",
+	ManageEvents:     "ManageEvents",
 }
 
 var Values = map[string]uint64{
@@ -28,6 +30,7 @@ var Values = map[string]uint64{
 	"KickMember":       KickMember,
 	"BanMember":        BanMember,
 	"ManageRoles":      ManageRoles,
+	"ManageEvents":     ManageEvents,
 }
 
 var PermissionList = []string{
@@ -37,6 +40,7 @@ var PermissionList = []string{
 	"KickMember",
 	"BanMember",
 	"ManageRoles",
+	"ManageEvents",
 }
 
 func PermissionsHexToStringArr(p uint64) []string {
