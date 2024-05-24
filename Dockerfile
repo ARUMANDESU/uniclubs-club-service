@@ -8,7 +8,7 @@ RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate
 
 COPY . .
 
-RUN CGO_ENABLED=1 GOOS=linux go build -o ./build/main ./cmd/
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./build/main ./cmd/
 
 ENV ENV="dev"
 ENV DATABASE_DSN="postgres://postgres:password@postgres:5432/clubdb"
