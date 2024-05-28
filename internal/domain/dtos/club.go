@@ -1,6 +1,9 @@
 package dtos
 
-import clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
+import (
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
+)
 
 type CreateClubDTO struct {
 	Name        string
@@ -32,6 +35,12 @@ type UnbanUserDTO struct {
 	ClubID  int64
 	UserID  int64
 	AdminID int64
+}
+
+type ListMembers struct {
+	ClubID int64
+	Query  string
+	Filter domain.Filters
 }
 
 func MapToChangeRolesPositionDTOArr(roles []*clubv1.ChangeRolesPositionItems) []*ChangeRolesPositionDTO {

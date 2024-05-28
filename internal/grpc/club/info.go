@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/info"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -35,7 +36,7 @@ type InfoService interface {
 		*domain.Metadata,
 		error,
 	)
-	ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
+	ListClubMembers(ctx context.Context, dto *dtos.ListMembers) ([]*domain.User, *domain.Metadata, error)
 	ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error)
 	ListBannedUsers(ctx context.Context, clubID int64, query string, filters domain.Filters) ([]*domain.BanRecord, *domain.Metadata, error)
 }
@@ -127,16 +128,22 @@ func (s serverApi) ListClubMembers(ctx context.Context, req *clubv1.ListClubMemb
 		validation.Field(&req.ClubId, validation.Required, validation.Min(1)),
 		validation.Field(&req.PageNumber, validation.Required, validation.Min(1)),
 		validation.Field(&req.PageSize, validation.Required, validation.Min(1)),
+		validation.Field(&req.Query, validation.Length(0, 300)),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	f := domain.Filters{
-		Page:     req.GetPageNumber(),
-		PageSize: req.GetPageSize(),
+
+	dto := dtos.ListMembers{
+		ClubID: req.GetClubId(),
+		Query:  req.GetQuery(),
+		Filter: domain.Filters{
+			Page:     req.GetPageNumber(),
+			PageSize: req.GetPageSize(),
+		},
 	}
 
-	members, metadata, err := s.info.ListClubMembers(ctx, req.GetClubId(), f)
+	members, metadata, err := s.info.ListClubMembers(ctx, &dto)
 	if err != nil {
 		return nil, status.Error(codes.Internal, ErrInternal.Error())
 	}

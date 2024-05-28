@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"github.com/ARUMANDESU/uniclubs-club-service/pkg/logger"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
@@ -41,11 +42,7 @@ type Storage interface {
 		clubType []string,
 		filters domain.Filters,
 	) ([]*domain.ClubUser, *domain.Metadata, error)
-	ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) (
-		[]*domain.User,
-		*domain.Metadata,
-		error,
-	)
+	ListClubMembers(ctx context.Context, dto *dtos.ListMembers) ([]*domain.User, *domain.Metadata, error)
 	ListMembershipRequests(ctx context.Context, clubID int64, filters domain.Filters) (
 		[]*domain.User,
 		*domain.Metadata,
@@ -155,11 +152,11 @@ func (s Service) GetUserClubs(ctx context.Context, userID int64) ([]*domain.Club
 	return clubs, nil
 }
 
-func (s Service) ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) ([]*domain.User, *domain.Metadata, error) {
+func (s Service) ListClubMembers(ctx context.Context, dto *dtos.ListMembers) ([]*domain.User, *domain.Metadata, error) {
 	const op = "services.info.ListClubMembers"
 	log := s.log.With(slog.String("op", op))
 
-	members, metadata, err := s.storage.ListClubMembers(ctx, clubID, filters)
+	members, metadata, err := s.storage.ListClubMembers(ctx, dto)
 	if err != nil {
 		log.Error("failed to get members of club", logger.Err(err))
 		return nil, nil, err

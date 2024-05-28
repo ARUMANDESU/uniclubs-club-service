@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
+	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
 	"time"
 )
@@ -313,19 +314,18 @@ func (s *Storage) GetUserClubsByID(ctx context.Context, userID int64) ([]*domain
 
 }
 
-func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters domain.Filters) (
-	[]*domain.User,
-	*domain.Metadata,
-	error,
-) {
-	const op = "storage.postgresql.GetUserClubsByID"
+func (s *Storage) ListClubMembers(ctx context.Context, dto *dtos.ListMembers) ([]*domain.User, *domain.Metadata, error) {
+	const op = "storage.postgresql.ListClubMembers"
 
 	stmt, err := s.DB.Prepare(`
 		SELECT count(*) OVER(), u.id, u.email, u.barcode, u.first_name, u.last_name, u.avatar_url
 		FROM clubs c 
 		JOIN clubs_users cu ON c.id = cu.club_id
 		JOIN users u ON cu.user_id = u.id
-		WHERE c.id = $1
+		WHERE  ( (STRPOS(LOWER(u.email), LOWER($4)) > 0 OR $4 = '') OR
+			 (STRPOS(LOWER(u.first_name), LOWER($4)) > 0 OR $4 = '') OR
+			(STRPOS(LOWER(u.last_name), LOWER($4)) > 0 OR $4 = '') )
+			AND c.id = $1
 		LIMIT $2 OFFSET $3;
 	`)
 	if err != nil {
@@ -337,7 +337,7 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	rows, err := stmt.QueryContext(ctx, clubID, filters.Limit(), filters.Offset())
+	rows, err := stmt.QueryContext(ctx, dto.ClubID, dto.Filter.Limit(), dto.Filter.Offset(), dto.Query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -368,7 +368,7 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 			JOIN roles r ON ur.role_id = r.id
 			WHERE ur.user_id = $1 AND r.club_id = $2;
     	`
-		rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, user.ID, clubID)
+		rolesRows, err := s.DB.QueryContext(ctx, rolesQuery, user.ID, dto.ClubID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: querying roles: %w", op, err)
 		}
@@ -388,7 +388,7 @@ func (s *Storage) ListClubMembers(ctx context.Context, clubID int64, filters dom
 
 	}
 
-	metadata := domain.CalculateMetadata(totalRecords, filters.Page, filters.PageSize)
+	metadata := domain.CalculateMetadata(totalRecords, dto.Filter.Page, dto.Filter.PageSize)
 
 	return users, &metadata, nil
 }
