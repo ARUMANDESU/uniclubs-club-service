@@ -279,7 +279,7 @@ func (s serverApi) HavePermissionTo(ctx context.Context, req *clubv1.HavePermiss
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	res, err := s.permission.HavePermissionTo(ctx, req.GetClubId(), req.GetUserId(), req.GetPermission())
+	res, err := s.permission.HavePermissionTo(ctx, req.GetClubId(), req.GetUserId(), uint64(req.GetPermission()))
 	if err != nil {
 		switch {
 		case errors.Is(err, management.ErrClubNotExists):

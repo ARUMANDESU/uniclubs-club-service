@@ -10,6 +10,8 @@ github.com/ARUMANDESU/uniclubs-protos v0.7.3 h1:rpQWdH78D3f/bVnhgQPQhzqIHAUyqE0Q
 github.com/ARUMANDESU/uniclubs-protos v0.7.3/go.mod h1:JAn34KH/sRvW7IfJcpqDXKLl2/J7QAKMCI4DPuD9PgM=
 github.com/ARUMANDESU/uniclubs-protos v0.7.4 h1:iDlYjs+nnpF/b2Hm4sv8HJoRO/A/cCvwMjeqhUgaTds=
 github.com/ARUMANDESU/uniclubs-protos v0.7.4/go.mod h1:JAn34KH/sRvW7IfJcpqDXKLl2/J7QAKMCI4DPuD9PgM=
+github.com/ARUMANDESU/uniclubs-protos v0.8.1 h1:7UNWIOIFvMKq9wV6VyASjzy5vL/6swidSz2IuVlxU4g=
+github.com/ARUMANDESU/uniclubs-protos v0.8.1/go.mod h1:JAn34KH/sRvW7IfJcpqDXKLl2/J7QAKMCI4DPuD9PgM=
 github.com/BurntSushi/toml v1.2.1 h1:9F2/+DoOYIOksmaJFPw1tGFy1eDnIJXg+UHjuD8lTak=
 github.com/BurntSushi/toml v1.2.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
