@@ -36,17 +36,6 @@ var Values = map[string]uint64{
 	"ManagePosts":      ManagePosts,
 }
 
-var PermissionList = []string{
-	"Administrator",
-	"ManageClub",
-	"ManageMembership",
-	"KickMember",
-	"BanMember",
-	"ManageRoles",
-	"ManageEvents",
-	"ManagePosts",
-}
-
 func PermissionsHexToStringArr(p uint64) []string {
 	var permissions []string
 	// Iterate over all possible permissions
@@ -78,6 +67,11 @@ func StringArrToHex(p []string) (uint64, error) {
 
 func AccumulatePermissions(roles []*Role) (accumulatedPermissions uint64) {
 	for _, role := range roles {
+		// Administrator role has all permissions
+		if role.Permissions&Administrator != 0 {
+			return ALL
+		}
+
 		accumulatedPermissions |= role.Permissions
 	}
 	return accumulatedPermissions
