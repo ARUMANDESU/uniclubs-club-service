@@ -15,6 +15,9 @@ const (
 	MinClubDescriptionLen = 4
 	MaxClubTypeLen        = 75
 	MinClubTypeLen        = 4
+	MinLocationLen        = 3
+	MaxLocationLen        = 250
+	MaxSocialLinkNum      = 4
 )
 
 type Club struct {
@@ -29,6 +32,8 @@ type Club struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Roles        []Role
+	SocialLinks  []string
+	Location     string
 }
 
 func (c Club) ToClubObject() *clubv1.ClubObject {
@@ -48,6 +53,8 @@ func (c Club) ToClubObject() *clubv1.ClubObject {
 		NumberOfMembers: c.NumOFMembers,
 		CreatedAt:       timestamppb.New(c.CreatedAt),
 		Roles:           roles,
+		SocialLinks:     c.SocialLinks,
+		Location:        c.Location,
 	}
 }
 

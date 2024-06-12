@@ -7,14 +7,14 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/services/management"
 	clubv1 "github.com/ARUMANDESU/uniclubs-protos/gen/go/club"
-	validation "github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type ManagementService interface {
-	// interface
 	CreateClub(ctx context.Context, dto dtos.CreateClubDTO) error
 	ApproveClub(ctx context.Context, clubID int64) error
 	RejectClub(ctx context.Context, clubID int64) error
@@ -114,6 +114,8 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 		validation.Field(&req.Name, validation.Length(domain.MinClubNameLen, domain.MaxClubNameLen)),
 		validation.Field(&req.Description, validation.Length(domain.MinClubDescriptionLen, domain.MaxClubDescriptionLen)),
 		validation.Field(&req.ClubType, validation.Length(domain.MinClubTypeLen, domain.MaxClubTypeLen)),
+		validation.Field(&req.SocialLinks, validation.Length(0, domain.MaxSocialLinkNum), validation.Each(is.URL)),
+		validation.Field(&req.Location, validation.Length(domain.MinLocationLen, domain.MaxLocationLen)),
 	)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -147,6 +149,10 @@ func (s serverApi) UpdateClub(ctx context.Context, req *clubv1.UpdateClubRequest
 			club.Description = req.GetDescription()
 		case "club_type":
 			club.ClubType = req.GetClubType()
+		case "social_links":
+			club.SocialLinks = req.GetSocialLinks()
+		case "location":
+			club.Location = req.GetLocation()
 		}
 	}
 

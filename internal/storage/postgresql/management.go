@@ -184,7 +184,8 @@ func (s *Storage) UpdateClub(ctx context.Context, club *domain.Club) error {
 	query := `
         UPDATE clubs 
         SET name = $2, owner_id = $3, description = $4, type = $5,
-            logo_url = $6, banner_url = $7, updated_at = current_timestamp
+            logo_url = $6, banner_url = $7, updated_at = current_timestamp,
+        	social_links = $9, location = $10
         WHERE id = $1 AND approved AND updated_at = $8
         returning updated_at
     `
@@ -192,7 +193,7 @@ func (s *Storage) UpdateClub(ctx context.Context, club *domain.Club) error {
 	args := []any{
 		club.ID, club.Name, club.OwnerID, club.Description,
 		club.ClubType, club.LogoURL, club.BannerURL,
-		club.UpdatedAt,
+		club.UpdatedAt, club.SocialLinks, club.Location,
 	}
 
 	err := s.DB.QueryRowContext(ctx, query, args...).Scan(&club.UpdatedAt)

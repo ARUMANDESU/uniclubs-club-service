@@ -3,8 +3,9 @@ module github.com/ARUMANDESU/uniclubs-club-service
 go 1.21.5
 
 require (
-	github.com/ARUMANDESU/uniclubs-protos v0.8.1
+	github.com/ARUMANDESU/uniclubs-protos v0.8.5
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang/protobuf v1.5.4
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.5.5
