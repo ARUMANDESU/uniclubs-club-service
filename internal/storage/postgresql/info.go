@@ -8,6 +8,7 @@ import (
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/domain/dtos"
 	"github.com/ARUMANDESU/uniclubs-club-service/internal/storage"
+	"github.com/jackc/pgx/v5/pgtype"
 	"time"
 )
 
@@ -15,25 +16,20 @@ func (s *Storage) GetClubByID(ctx context.Context, clubID int64, isApproved bool
 	const op = "storage.postgresql.GetClubByID"
 
 	clubQuery := `
-        SELECT id, owner_id, name, description, type, logo_url, banner_url, created_at, updated_at, COUNT(user_id) as member_count
+        SELECT id, owner_id, name, description, type, logo_url, banner_url, created_at, updated_at, social_links, location, COUNT(user_id)
         FROM clubs c
         LEFT JOIN clubs_users cu ON c.id = cu.club_id
         WHERE c.id = $1 AND approved = $2
         GROUP BY c.id;
     `
 
+	m := pgtype.NewMap()
 	var club domain.Club
 	err := s.DB.QueryRowContext(ctx, clubQuery, clubID, isApproved).Scan(
-		&club.ID,
-		&club.OwnerID,
-		&club.Name,
-		&club.Description,
-		&club.ClubType,
-		&club.LogoURL,
-		&club.BannerURL,
-		&club.CreatedAt,
-		&club.UpdatedAt,
-		&club.NumOFMembers,
+		&club.ID, &club.OwnerID, &club.Name,
+		&club.Description, &club.ClubType, &club.LogoURL,
+		&club.BannerURL, &club.CreatedAt, &club.UpdatedAt,
+		m.SQLScanner(&club.SocialLinks), &club.Location, &club.NumOFMembers,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
